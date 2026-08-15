@@ -35,13 +35,22 @@ class GameManager {
     }
 
     save() {
+        if (localStorage.getItem('rpg_save_consent') !== 'true') {
+            console.log("Sauvegarde ignorée (pas de consentement RGPD)");
+            return;
+        }
+        
         const data = {
             player: this.player,
             inventory: this.inventory,
             quests: this.quests
         };
-        localStorage.setItem('rpg_save_v1', JSON.stringify(data));
-        console.log("Jeu sauvegardé !");
+        try {
+            localStorage.setItem('rpg_save_v1', JSON.stringify(data));
+            console.log("Jeu sauvegardé !");
+        } catch (e) {
+            console.error("Erreur lors de la sauvegarde", e);
+        }
     }
 
     load() {
