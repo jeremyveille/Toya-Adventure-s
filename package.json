@@ -4,7 +4,8 @@
   "description": "Phaser RPG Game",
   "main": "main.js",
   "scripts": {
-    "start": "npx serve -l 3000"
+    "start": "npx serve -l 3000",
+    "test": "node tests/run_tests.js"
   },
   "author": "",
   "license": "ISC"
