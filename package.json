@@ -1,0 +1,11 @@
+{
+  "name": "rpg-akira-toriyama-style",
+  "version": "1.0.0",
+  "description": "Phaser RPG Game",
+  "main": "main.js",
+  "scripts": {
+    "start": "npx serve -l 3000"
+  },
+  "author": "",
+  "license": "ISC"
+}
