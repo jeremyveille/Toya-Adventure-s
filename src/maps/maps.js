@@ -3,39 +3,38 @@ const MapsData = {
         tileSize: 64,
         layoutText: [
             "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
-            "TCCCCCCCCCC...TTTTT..CCTTTT....T...HHH.T",
-            "TCC.....CCC...TTTTT..CCTTTT....T...HHH.T",
-            "TCC..S..CCC...TTTTT..CCTTTT....T...HHH.T",
-            "TCC.....CCC.TTTTTTT.......T....T...d...T",
-            "TCCCCCCCCCC.TTTTTTT.......T....T...d...T",
-            "TTTT.TTT.....TTTTTT..T.........T...d...T",
-            "TTT...T...N...TTTTT..T...TT........d...T",
-            "TT........d....TTTT..T...TT....ddddd...T",
-            "TTT......ddd.....T...T.........d.......T",
-            "TTTT...ddddddd...T...T.........d.......T",
-            "TTTT...dTTTTTd...T...T.........d.......T",
-            "T......dTTTTTd...T...T.........d.......T",
-            "T..R...dTTTTTd...T...T.........d.......T",
-            "T......d..B..d.......T.........d.......T",
-            "WWWWWWWWWWWWWWWWWWWWWWbbbbWWWWWWWWWWWWWW",
-            "WWWWWWWWWWWWWWWWWWWWWWbbbbWWWWWWWWWWWWWW",
-            "T.........E..........T.......dddddd....T",
-            "T....................T.......d.........T",
-            "T....................T.......d...RRR...T",
-            "T....................T.......d...RRR...T",
-            "T...o................TTTTTTTTd...RRR...T",
-            "T............................d.........T",
-            "T............................d.........T",
+            "TCCCT.......t...T......CCTTTT......HHH.T",
+            "TCC.....t.......T..t...CCTTTT..>...HHH.T",
+            "TCC..S......T...T......CCTTTT......HHH.T",
+            "TCC.....t.......TTT...t.......T....d...T",
+            "TCC.......T.....TT............T....d...T",
+            "TTT..........T..TT..t...t..........d...T",
+            "TT....T...N.....TT...TTT...........d...T",
+            "TT......>...d.....TT...T......x..ddddd.T",
+            "TTT......ddd.........T........x..d...x.T",
+            "TTTT...ddddddd..T....T...........d.....T",
+            "TTTT...d.....d.......T...t.......d.....T",
+            "T...b..d..t..d.......T.........b.d.....T",
+            "T..R...d.....d.......T...........d.....T",
+            "T...r..d.....d..b....T...........d.....T",
+            "WWWWWWWWWWWWWWWWWWWWWWWWWWBBBBWWWWWWWWWW",
+            "WWWWWWWWWWWWWWWWWWWWWWWWWWBBBBWWWWWWWWWW",
+            "T....................T.......dddddd....T",
+            "T.....b....E...t.....T...t...d....x....T",
+            "T............................d...RRR...T",
+            "T.......T............T.......d...RRR...T",
+            "T...o.........t......T.......d...RRR...T",
+            "T.................b..........d....r....T",
+            "T..t......t..................d.........T",
             "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
         ],
         npcsData: {
-            "N": { id: "npc1", name: "Guide", dialogue: "Bienvenue.\nDétruis le buisson au sud [Espace].\nEnsuite, traverse le pont.\nPrends garde aux monstres !", questItem: null, questQty: null }
+            "N": { id: "npc1", name: "Guide", dialogue: "Bienvenue.\nUn monde dangereux t'attend.\nDétruis le buisson au sud [Espace].\nTraverse le pont et reste sur tes gardes !", questItem: null, questQty: null }
         },
         chestsData: {
             "o": { id: "chest1", item: { id: "potion", name: "Potion de Soin", qty: 3 }, opened: false }
         },
         doorsData: {
-            // "H" will generate the house, the door will be at the bottom center of the House tiles
             houseDoorTarget: "House1",
             houseSpawn: {x: 4, y: 5}
         }
