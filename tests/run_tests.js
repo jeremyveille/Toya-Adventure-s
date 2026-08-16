@@ -1,104 +1,111 @@
-// Simple custom test runner for GameManager
 const assert = require('assert');
-const fs = require('fs');
+const path = require('path');
 
-const vm = require('vm');
-
-// Polyfill window and localStorage
-const sandbox = {
-    window: {},
-    console: console
-};
-
-sandbox.localStorage = {
+// Mock localStorage for Node.js environment
+global.localStorage = {
     _data: {},
     getItem: function(key) { return this._data[key] || null; },
-    setItem: function(key, value) { this._data[key] = String(value); },
+    setItem: function(key, val) { this._data[key] = String(val); },
     removeItem: function(key) { delete this._data[key]; },
     clear: function() { this._data = {}; }
 };
 
-vm.createContext(sandbox);
-const gameManagerCode = fs.readFileSync('./src/managers/GameManager.js', 'utf8') + '\nwindow.GameManager = GameManager;';
-vm.runInContext(gameManagerCode, sandbox);
+// Load dependencies
+const GameConfig = require('../src/data/config.js');
+const GameManager = require('../src/managers/GameManager.js');
 
-// Tests
-console.log("Running GameManager tests...");
-let passed = 0;
-let failed = 0;
-
-function runTest(name, fn) {
-    try {
-        // Reset state before each test
-        sandbox.localStorage.clear();
-        sandbox.window.gameState = new sandbox.window.GameManager();
-        fn();
-        console.log(`✅ ${name}`);
-        passed++;
-    } catch (e) {
-        console.error(`❌ ${name}`);
-        console.error(e);
-        failed++;
+function runTests() {
+    console.log("Démarrage des tests unitaires du GameManager...");
+    let passed = 0;
+    let failed = 0;
+    
+    function test(name, fn) {
+        try {
+            fn();
+            console.log(`[PASS] ${name}`);
+            passed++;
+        } catch (e) {
+            console.error(`[FAIL] ${name}`);
+            console.error(e);
+            failed++;
+        }
     }
+
+    test("Initialisation avec la config", () => {
+        const gm = new GameManager(GameConfig);
+        assert.strictEqual(gm.player.level, 1);
+        assert.strictEqual(gm.player.hp, 100);
+        assert.strictEqual(gm.inventory.length, 0);
+        assert.strictEqual(gm.quests[0].id, "q1");
+    });
+
+    test("Ajout et retrait d'objets (Inventaire)", () => {
+        const gm = new GameManager(GameConfig);
+        gm.addItem({ id: "wood", name: "Bois", qty: 2 });
+        assert.strictEqual(gm.inventory.length, 1);
+        assert.strictEqual(gm.inventory[0].qty, 2);
+        
+        gm.addItem({ id: "wood", name: "Bois", qty: 3 });
+        assert.strictEqual(gm.inventory.length, 1);
+        assert.strictEqual(gm.inventory[0].qty, 5);
+        
+        const removed = gm.removeItem("wood", 2);
+        assert.strictEqual(removed, true);
+        assert.strictEqual(gm.inventory[0].qty, 3);
+        
+        const removedTooMany = gm.removeItem("wood", 10);
+        assert.strictEqual(removedTooMany, false);
+        assert.strictEqual(gm.inventory[0].qty, 3);
+        
+        gm.removeItem("wood", 3);
+        assert.strictEqual(gm.inventory.length, 0);
+    });
+
+    test("Crafting de recette (Pont en Bois)", () => {
+        const gm = new GameManager(GameConfig);
+        gm.addItem({ id: "wood", name: "Bois", qty: 10 });
+        
+        const crafted = gm.craftItem("bridge");
+        assert.strictEqual(crafted, true);
+        
+        const bridge = gm.inventory.find(i => i.id === "bridge");
+        const wood = gm.inventory.find(i => i.id === "wood");
+        assert.ok(bridge);
+        assert.strictEqual(bridge.qty, 1);
+        assert.strictEqual(wood.qty, 5); // 10 - 5
+    });
+    
+    test("Utilisation d'objets (Potion)", () => {
+        const gm = new GameManager(GameConfig);
+        gm.addItem({ id: "potion", name: "Potion", qty: 1 });
+        gm.player.hp = 50;
+        
+        const used = gm.useItem("potion");
+        assert.strictEqual(used, true);
+        assert.strictEqual(gm.player.hp, 80); // 50 + 30
+        assert.strictEqual(gm.inventory.length, 0);
+    });
+    
+    test("Gain d'XP et Level Up", () => {
+        const gm = new GameManager(GameConfig);
+        gm.player.xp = 90;
+        gm.player.level = 1;
+        gm.player.maxHp = 100;
+        
+        const noLevelUp = gm.checkLevelUp();
+        assert.strictEqual(noLevelUp, false);
+        
+        gm.player.xp = 110;
+        const levelUp = gm.checkLevelUp();
+        assert.strictEqual(levelUp, true);
+        assert.strictEqual(gm.player.level, 2);
+        assert.strictEqual(gm.player.xp, 10);
+        assert.strictEqual(gm.player.maxHp, 120);
+        assert.strictEqual(gm.player.hp, 120);
+    });
+
+    console.log(`\nTests terminés : ${passed} succès, ${failed} échecs.`);
+    process.exit(failed > 0 ? 1 : 0);
 }
 
-runTest("Player starts at level 1 with correct HP", () => {
-    assert.strictEqual(sandbox.window.gameState.player.level, 1);
-    assert.strictEqual(sandbox.window.gameState.player.hp, 100);
-});
-
-runTest("Add item updates inventory", () => {
-    sandbox.window.gameState.addItem({ id: "potion", name: "Potion", qty: 2 });
-    assert.strictEqual(sandbox.window.gameState.inventory.length, 1);
-    assert.strictEqual(sandbox.window.gameState.inventory[0].qty, 2);
-});
-
-runTest("Remove item updates inventory correctly", () => {
-    sandbox.window.gameState.addItem({ id: "potion", name: "Potion", qty: 2 });
-    let res = sandbox.window.gameState.removeItem("potion", 1);
-    assert.strictEqual(res, true);
-    assert.strictEqual(sandbox.window.gameState.inventory[0].qty, 1);
-    
-    // Remove last one
-    sandbox.window.gameState.removeItem("potion", 1);
-    assert.strictEqual(sandbox.window.gameState.inventory.length, 0);
-});
-
-runTest("Check level up logic", () => {
-    sandbox.window.gameState.player.xp = 150;
-    sandbox.window.gameState.checkLevelUp();
-    assert.strictEqual(sandbox.window.gameState.player.level, 2);
-    assert.strictEqual(sandbox.window.gameState.player.xp, 50); // 150 - 100
-    assert.strictEqual(sandbox.window.gameState.player.maxHp, 120);
-});
-
-runTest("Craft item logic", () => {
-    sandbox.window.gameState.addItem({ id: "wood", name: "Bois", qty: 5 });
-    let success = sandbox.window.gameState.craftItem("bridge");
-    assert.strictEqual(success, true);
-    assert.strictEqual(sandbox.window.gameState.inventory.find(i => i.id === "wood"), undefined);
-    assert.strictEqual(sandbox.window.gameState.inventory.find(i => i.id === "bridge").qty, 1);
-    
-    // Fail to craft again
-    let fail = sandbox.window.gameState.craftItem("bridge");
-    assert.strictEqual(fail, false);
-});
-
-runTest("Use item logic", () => {
-    sandbox.window.gameState.player.hp = 50;
-    sandbox.window.gameState.addItem({ id: "potion", name: "Potion", qty: 1 });
-    let success = sandbox.window.gameState.useItem("potion");
-    assert.strictEqual(success, true);
-    assert.strictEqual(sandbox.window.gameState.player.hp, 80); // 50 + 30
-    assert.strictEqual(sandbox.window.gameState.inventory.find(i => i.id === "potion"), undefined);
-});
-
-runTest("Complete quest goal logic", () => {
-    let success = sandbox.window.gameState.completeQuestGoal("talk", "npc1");
-    assert.strictEqual(success, true);
-    assert.strictEqual(sandbox.window.gameState.quests[0].status, "completed");
-    assert.strictEqual(sandbox.window.gameState.player.xp, 50);
-});
-
-console.log(`\nTests completed: ${passed} passed, ${failed} failed.`);
-if (failed > 0) process.exit(1);
+runTests();

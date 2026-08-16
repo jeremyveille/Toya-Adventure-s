@@ -1,41 +1,58 @@
+/**
+ * @typedef {Object} PlayerState
+ * @property {number} level
+ * @property {number} xp
+ * @property {number} hp
+ * @property {number} maxHp
+ * @property {number} mp
+ * @property {number} maxMp
+ * @property {number} gold
+ * @property {number} damage
+ */
+
+/**
+ * @typedef {Object} InventoryItem
+ * @property {string} id
+ * @property {string} name
+ * @property {number} qty
+ */
+
+/**
+ * @typedef {Object} Quest
+ * @property {string} id
+ * @property {string} title
+ * @property {string} desc
+ * @property {string} status - "not_started" | "active" | "completed"
+ * @property {string} goalType
+ * @property {string} goalTarget
+ */
+
 class GameManager {
-    constructor() {
+    /**
+     * @param {Object} config - The global game configuration
+     */
+    constructor(config) {
+        this.config = config || (typeof GameConfig !== 'undefined' ? GameConfig : {});
         this.reset();
     }
 
+    /**
+     * Reset the game state to default
+     */
     reset() {
-        this.player = {
-            level: 1,
-            xp: 0,
-            hp: 100,
-            maxHp: 100,
-            mp: 50,
-            maxMp: 50,
-            gold: 0,
-            damage: 20
-        };
-
-        // Inventaire (Tableau d'objets)
-        // Objet: { id: "potion", name: "Potion de Soin", qty: 2 }
+        // Deep copy from config to avoid mutating the original config
+        this.player = JSON.parse(JSON.stringify(this.config.initialPlayerState || {}));
+        /** @type {InventoryItem[]} */
         this.inventory = [];
-
-        // Quêtes
-        // Quête: { id: "q1", title: "Le Début", desc: "Parler à l'ancien", status: "active", goal: "talk_ancien" }
-        // status = "not_started" | "active" | "completed"
-        this.quests = [
-            { 
-                id: "q1", 
-                title: "L'Eveil du Héros", 
-                desc: "Parlez à l'Ancien du village.", 
-                status: "active",
-                goalType: "talk",
-                goalTarget: "npc1"
-            }
-        ];
+        /** @type {Quest[]} */
+        this.quests = JSON.parse(JSON.stringify(this.config.initialQuests || []));
     }
 
+    /**
+     * Saves the current game state to localStorage if RGPD consent is given
+     */
     save() {
-        if (localStorage.getItem('rpg_save_consent') !== 'true') {
+        if (typeof localStorage !== 'undefined' && localStorage.getItem('rpg_save_consent') !== 'true') {
             console.log("Sauvegarde ignorée (pas de consentement RGPD)");
             return;
         }
@@ -46,40 +63,64 @@ class GameManager {
             quests: this.quests
         };
         try {
-            localStorage.setItem('rpg_save_v1', JSON.stringify(data));
-            console.log("Jeu sauvegardé !");
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('rpg_save_v1', JSON.stringify(data));
+                console.log("Jeu sauvegardé !");
+            }
         } catch (e) {
             console.error("Erreur lors de la sauvegarde", e);
         }
     }
 
+    /**
+     * Loads the game state from localStorage with basic validation
+     * @returns {boolean} True if load was successful
+     */
     load() {
+        if (typeof localStorage === 'undefined') return false;
+        
         const savedStr = localStorage.getItem('rpg_save_v1');
         if (savedStr) {
             try {
                 const data = JSON.parse(savedStr);
-                this.player = data.player;
-                this.inventory = data.inventory;
-                this.quests = data.quests;
-                console.log("Partie chargée !");
-                return true;
+                // Validation très basique pour des raisons de sécurité / RGPD (minimisation des données)
+                // On s'assure que les types attendus sont présents.
+                if (data && typeof data === 'object') {
+                    if (data.player && typeof data.player.hp === 'number') this.player = data.player;
+                    if (Array.isArray(data.inventory)) this.inventory = data.inventory;
+                    if (Array.isArray(data.quests)) this.quests = data.quests;
+                    console.log("Partie chargée !");
+                    return true;
+                }
             } catch (e) {
-                console.error("Erreur de chargement", e);
+                console.error("Erreur de chargement (données potentiellement corrompues)", e);
             }
         }
         return false;
     }
 
+    /**
+     * Adds an item to the inventory
+     * @param {InventoryItem} item 
+     */
     addItem(item) {
+        if (!item || typeof item.id !== 'string') return;
+        
         let existing = this.inventory.find(i => i.id === item.id);
         if(existing) {
             existing.qty += item.qty;
         } else {
-            this.inventory.push(item);
+            this.inventory.push({...item}); // Shallow copy to avoid reference mutation
         }
         this.save();
     }
 
+    /**
+     * Removes an item from the inventory
+     * @param {string} itemId 
+     * @param {number} qty 
+     * @returns {boolean} True if successfully removed
+     */
     removeItem(itemId, qty = 1) {
         let existing = this.inventory.find(i => i.id === itemId);
         if(existing && existing.qty >= qty) {
@@ -93,6 +134,12 @@ class GameManager {
         return false;
     }
 
+    /**
+     * Completes a quest goal
+     * @param {string} goalType 
+     * @param {string} goalTarget 
+     * @returns {boolean} True if a quest was updated
+     */
     completeQuestGoal(goalType, goalTarget) {
         let updated = false;
         this.quests.forEach(q => {
@@ -108,6 +155,10 @@ class GameManager {
         return updated;
     }
 
+    /**
+     * Checks and applies level up if enough XP
+     * @returns {boolean} True if the player leveled up
+     */
     checkLevelUp() {
         let xpNeeded = this.player.level * 100;
         if(this.player.xp >= xpNeeded) {
@@ -121,16 +172,16 @@ class GameManager {
         return false;
     }
 
+    /**
+     * Crafts an item based on recipeId
+     * @param {string} recipeId 
+     * @returns {boolean} True if crafted successfully
+     */
     craftItem(recipeId) {
-        const recipes = {
-            "bridge": { name: "Pont en Bois", cost: [{id: "wood", qty: 5}], result: {id: "bridge", name: "Pont en Bois", qty: 1} },
-            "potion": { name: "Potion de Soin", cost: [{id: "wood", qty: 2}, {id: "stone", qty: 1}], result: {id: "potion", name: "Potion de Soin", qty: 1} }
-        };
-        
+        const recipes = this.config.recipes || {};
         let recipe = recipes[recipeId];
         if(!recipe) return false;
         
-        // Check if we have resources
         let canCraft = true;
         recipe.cost.forEach(c => {
             let item = this.inventory.find(i => i.id === c.id);
@@ -145,11 +196,14 @@ class GameManager {
         return false;
     }
 
+    /**
+     * Uses an item from the inventory
+     * @param {string} itemId 
+     * @returns {boolean} True if used successfully
+     */
     useItem(itemId) {
-        // Tente de retirer 1 quantité de l'objet
         if (this.removeItem(itemId, 1)) {
             if (itemId === 'potion') {
-                // Soin de 30 HP
                 this.player.hp = Math.min(this.player.maxHp, this.player.hp + 30);
                 return true;
             }
@@ -158,5 +212,10 @@ class GameManager {
     }
 }
 
-// Instance globale du manager de jeu
-window.gameState = new GameManager();
+// Permet l'import dans Node.js pour les tests, tout en fonctionnant dans le navigateur
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = GameManager;
+} else {
+    // Instance globale du manager de jeu dans le navigateur
+    window.gameState = new GameManager();
+}
