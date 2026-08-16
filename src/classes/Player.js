@@ -108,6 +108,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         if (Phaser.Input.Keyboard.JustDown(this.spaceBar)) {
             this.performActionAttack();
         }
+
+        // Depth sorting
+        this.setDepth(this.y);
     }
 
     performActionAttack() {

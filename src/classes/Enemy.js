@@ -43,6 +43,11 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.setVelocity(dir[0] * 50, dir[1] * 50);
     }
 
+    preUpdate(time, delta) {
+        super.preUpdate(time, delta);
+        this.setDepth(this.y);
+    }
+
     shootAtPlayer() {
         if (this.hp <= 0 || !this.scene || !this.scene.player) return;
         
