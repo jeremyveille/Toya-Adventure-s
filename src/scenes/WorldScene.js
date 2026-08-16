@@ -204,6 +204,11 @@ class WorldScene extends Phaser.Scene {
 
         // Lancement de l'UI globale
         this.scene.launch('HUDScene');
+
+        // ==== TUTORIEL (Niveau 1) ====
+        if (this.targetMapName === "Village") {
+            this.setupTutorial();
+        }
     }
 
     handleInteraction(playerHitbox, interactiveZone) {
@@ -252,6 +257,73 @@ class WorldScene extends Phaser.Scene {
 
         // Appelle la boucle d'update du joueur
         this.player.update();
+
+        if (this.targetMapName === "Village") {
+            this.updateTutorial();
+        }
+    }
+
+    setupTutorial() {
+        this.tutorialTexts = [];
+        const ts = this.currentMapData.tileSize;
+        
+        const addTutorialText = (x, y, text) => {
+            let t = this.add.text(x * ts + ts/2, y * ts, text, {
+                fontSize: '14px',
+                fontFamily: '"Press Start 2P", monospace',
+                color: '#ffffff',
+                backgroundColor: '#000000aa',
+                padding: { x: 5, y: 5 },
+                align: 'center'
+            }).setOrigin(0.5).setAlpha(0);
+            t.setDepth(100);
+            this.tutorialTexts.push({ obj: t, triggerX: x * ts + ts/2, triggerY: y * ts + ts/2, active: false, done: false, condition: null });
+            return t;
+        };
+
+        // Zone 1: Déplacement
+        let t1 = addTutorialText(2, 3.5, "Déplace-toi avec\nZQSD ou Flèches");
+        this.tutorialTexts[0].condition = () => this.player.body.velocity.length() > 0;
+        this.tutorialTexts[0].active = true;
+        this.tutorialTexts[0].obj.setAlpha(1);
+
+        // Zone 2: Interaction
+        let t2 = addTutorialText(7, 2.5, "[E] Interagir");
+        this.tutorialTexts[1].triggerDist = 120;
+        this.tutorialTexts[1].condition = () => this.scene.get('HUDScene').isDialogueActive;
+
+        // Zone 3: Combat
+        let t3 = addTutorialText(10, 2.5, "[Espace] Attaquer");
+        this.tutorialTexts[2].triggerDist = 150;
+        this.tutorialTexts[2].condition = () => this.player.isAttacking;
+
+        // Zone 4: Loot & Inventaire
+        let t4 = addTutorialText(13, 2.5, "[I] Inventaire\n[1] Utiliser Potion");
+        this.tutorialTexts[3].triggerDist = 120;
+        this.tutorialTexts[3].condition = () => this.scene.get('HUDScene').isMenuActive && this.scene.get('HUDScene').menuTitle.text === "INVENTAIRE";
+    }
+
+    updateTutorial() {
+        if (!this.tutorialTexts) return;
+
+        this.tutorialTexts.forEach(step => {
+            if (step.done) return;
+
+            // Déclenchement à l'approche
+            if (!step.active && step.triggerDist) {
+                let dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, step.triggerX, step.triggerY);
+                if (dist < step.triggerDist) {
+                    step.active = true;
+                    this.tweens.add({ targets: step.obj, alpha: 1, duration: 500 });
+                }
+            }
+
+            // Condition de validation
+            if (step.active && step.condition && step.condition()) {
+                step.done = true;
+                this.tweens.add({ targets: step.obj, alpha: 0, duration: 500 });
+            }
+        });
     }
 
     hitMinorEnemy(weaponBox, enemy) {
@@ -259,7 +331,7 @@ class WorldScene extends Phaser.Scene {
             let dmg = window.gameState ? window.gameState.player.damage : 10;
             enemy.takeDamage(dmg);
             this.cameras.main.shake(100, 0.005);
-            window.playSound('hit');
+            window.audioManager.play('hit');
         }
     }
 
@@ -282,7 +354,7 @@ class WorldScene extends Phaser.Scene {
         let itemId = resZone.resData.type === 'bush' ? 'wood' : 'stone';
         let itemName = resZone.resData.type === 'bush' ? 'Bois' : 'Pierre';
         window.gameState.addItem({ id: itemId, name: itemName, qty: 1 });
-        window.playSound('collect');
+        window.audioManager.play('collect');
         
         let txt = this.add.text(resZone.x, resZone.y - 20, `+1 ${itemName}`, { fontSize: '14px', fontFamily: '"Press Start 2P"', color: '#ffffff' }).setOrigin(0.5);
         this.tweens.add({ targets: txt, y: txt.y - 40, alpha: 0, duration: 1500, onComplete: () => txt.destroy() });

@@ -65,14 +65,14 @@ class HUDScene extends Phaser.Scene {
         // Commandes de craft rapides si le menu craft est ouvert
         if (this.isMenuActive && this.menuTitle.text === "CRAFTING") {
             if (Phaser.Input.Keyboard.JustDown(this.num1Key)) {
-                if (window.gameState.craftItem("bridge")) window.playSound('levelup');
-                else window.playSound('hit'); // Son d'erreur
+                if (window.gameState.craftItem("bridge")) window.audioManager.play('levelup');
+                else window.audioManager.play('hit'); // Son d'erreur
                 this.toggleMenu("CRAFTING"); // Rafraichit
                 this.toggleMenu("CRAFTING");
             }
             if (Phaser.Input.Keyboard.JustDown(this.num2Key)) {
-                if (window.gameState.craftItem("potion")) window.playSound('levelup');
-                else window.playSound('hit');
+                if (window.gameState.craftItem("potion")) window.audioManager.play('levelup');
+                else window.audioManager.play('hit');
                 this.toggleMenu("CRAFTING");
                 this.toggleMenu("CRAFTING");
             }
@@ -82,9 +82,9 @@ class HUDScene extends Phaser.Scene {
         if (this.isMenuActive && this.menuTitle.text === "INVENTAIRE") {
             if (Phaser.Input.Keyboard.JustDown(this.num1Key)) {
                 if (window.gameState.useItem("potion")) {
-                    window.playSound('collect'); // Son agréable pour le soin
+                    window.audioManager.play('collect'); // Son agréable pour le soin
                 } else {
-                    window.playSound('hit'); // Erreur (pas de potion)
+                    window.audioManager.play('hit'); // Erreur (pas de potion)
                 }
                 this.toggleMenu("INVENTAIRE");
                 this.toggleMenu("INVENTAIRE"); // Rafraichissement

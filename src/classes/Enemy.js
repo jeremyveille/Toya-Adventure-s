@@ -65,7 +65,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
             if (b && b.active) b.destroy();
             window.gameState.player.hp -= 10;
             this.scene.cameras.main.shake(100, 0.01);
-            if (window.playSound) window.playSound('hit');
+            if (window.audioManager.play) window.audioManager.play('hit');
             // Effet rouge sur le joueur
             p.setTint(0xff0000);
             this.scene.time.delayedCall(200, () => p.clearTint());
@@ -120,7 +120,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
                 let lvlText = this.scene.add.text(this.scene.player.x, this.scene.player.y - 50, "LEVEL UP!", { fontSize: '20px', fontFamily: '"Press Start 2P"', color: '#00ff00', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5);
                 this.scene.tweens.add({ targets: lvlText, y: this.scene.player.y - 100, alpha: 0, duration: 2500, onComplete: () => lvlText.destroy() });
                 this.scene.cameras.main.flash(500, 255, 255, 255); // Flash blanc de niveau
-                if (window.playSound) window.playSound('levelup');
+                if (window.audioManager.play) window.audioManager.play('levelup');
             }
         }
 
