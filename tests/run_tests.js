@@ -72,5 +72,33 @@ runTest("Check level up logic", () => {
     assert.strictEqual(sandbox.window.gameState.player.maxHp, 120);
 });
 
+runTest("Craft item logic", () => {
+    sandbox.window.gameState.addItem({ id: "wood", name: "Bois", qty: 5 });
+    let success = sandbox.window.gameState.craftItem("bridge");
+    assert.strictEqual(success, true);
+    assert.strictEqual(sandbox.window.gameState.inventory.find(i => i.id === "wood"), undefined);
+    assert.strictEqual(sandbox.window.gameState.inventory.find(i => i.id === "bridge").qty, 1);
+    
+    // Fail to craft again
+    let fail = sandbox.window.gameState.craftItem("bridge");
+    assert.strictEqual(fail, false);
+});
+
+runTest("Use item logic", () => {
+    sandbox.window.gameState.player.hp = 50;
+    sandbox.window.gameState.addItem({ id: "potion", name: "Potion", qty: 1 });
+    let success = sandbox.window.gameState.useItem("potion");
+    assert.strictEqual(success, true);
+    assert.strictEqual(sandbox.window.gameState.player.hp, 80); // 50 + 30
+    assert.strictEqual(sandbox.window.gameState.inventory.find(i => i.id === "potion"), undefined);
+});
+
+runTest("Complete quest goal logic", () => {
+    let success = sandbox.window.gameState.completeQuestGoal("talk", "npc1");
+    assert.strictEqual(success, true);
+    assert.strictEqual(sandbox.window.gameState.quests[0].status, "completed");
+    assert.strictEqual(sandbox.window.gameState.player.xp, 50);
+});
+
 console.log(`\nTests completed: ${passed} passed, ${failed} failed.`);
 if (failed > 0) process.exit(1);
