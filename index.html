@@ -10,17 +10,17 @@
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
         :root {
-            --bg-color: #1a1a2e;
-            --bg-gradient: #16213e;
+            --bg-color: #0c151c;
+            --bg-gradient: #111a24;
             --text-color: #f0f0f0;
-            --accent-primary: #ff00ff;
-            --accent-secondary: #00ffff;
-            --btn-bg: #228b22;
-            --btn-danger: #d90429;
-            --btn-danger-hover: #ef233c;
-            --btn-hover: #2eb82e;
-            --panel-bg: rgba(0, 0, 0, 0.6);
-            --focus-outline: 3px solid var(--accent-secondary);
+            --accent-primary: #b89947; /* gold */
+            --accent-secondary: #d4af37; /* light gold */
+            --btn-bg: #162436;
+            --btn-danger: #8b0000;
+            --btn-danger-hover: #a50000;
+            --btn-hover: #1e334d;
+            --panel-bg: #0c151c;
+            --focus-outline: 2px solid var(--accent-secondary);
         }
 
         body {
@@ -37,11 +37,11 @@
         }
 
         h1 {
-            font-size: 28px;
-            text-shadow: 2px 2px 0 var(--accent-primary), -2px -2px 0 var(--accent-secondary);
-            margin-bottom: 25px;
+            font-size: 24px;
+            color: #d4af37;
+            text-shadow: 2px 2px 0 #000;
+            margin-bottom: 20px;
             text-align: center;
-            animation: pulse 3s infinite alternate;
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -51,9 +51,10 @@
         }
 
         canvas {
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(0, 255, 255, 0.4);
-            border: 4px solid #fff;
-            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+            border: 4px solid #111a24;
+            outline: 2px solid #b89947;
+            border-radius: 4px;
             image-rendering: pixelated;
             position: relative;
             z-index: 1;
@@ -88,9 +89,7 @@
         .controls-panel {
             margin-top: 25px;
             padding: 15px 25px;
-            background: var(--panel-bg);
-            border: 2px solid #555;
-            border-radius: 8px;
+            background: transparent;
             max-width: 800px;
             width: 100%;
             box-sizing: border-box;
@@ -102,15 +101,32 @@
 
         .controls {
             font-size: 11px;
-            color: #ddd;
+            color: #f0f0f0;
             text-align: center;
-            line-height: 2;
+            line-height: 2.5;
             text-shadow: 1px 1px 0 #000;
             margin: 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
         }
 
-        .controls p {
-            margin: 5px 0;
+        .controls span {
+            margin-right: 5px;
+        }
+
+        kbd {
+            display: inline-block;
+            padding: 4px 8px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #d4af37;
+            background-color: #0c151c;
+            border: 2px solid #b89947;
+            border-radius: 4px;
+            box-shadow: 2px 2px 0 #000;
+            margin: 0 4px;
         }
 
         .footer-actions {
@@ -231,17 +247,21 @@
     </style>
 </head>
 <body>
-    <div id="rgpd-dialog" role="dialog" aria-labelledby="rgpd-title" aria-describedby="rgpd-desc" aria-hidden="true" aria-modal="true">
+    <!-- ARIA Live Region pour les annonces du lecteur d'écran (ex: objets ramassés, quêtes) -->
+    <div id="aria-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <div id="rgpd-dialog" role="dialog" aria-labelledby="rgpd-title" aria-describedby="rgpd-desc" aria-hidden="true" aria-modal="true" tabindex="-1">
         <span id="rgpd-title" class="rgpd-header">Paramètres de confidentialité</span>
-        <p id="rgpd-desc">Ce jeu utilise le stockage local de votre navigateur (`localStorage`) exclusivement pour sauvegarder votre progression (inventaire, niveau, quêtes). Aucune donnée personnelle n'est collectée ni partagée avec des tiers. Autorisez-vous la sauvegarde de votre progression ?</p>
+        <p id="rgpd-desc">Ce jeu utilise le stockage local de votre navigateur (`localStorage`) **exclusivement** pour sauvegarder votre progression en local (inventaire, niveau, quêtes). Aucune donnée personnelle (nom, email, IP) n'est collectée, analysée, ni partagée avec des tiers. Autorisez-vous la sauvegarde de votre progression ?</p>
+        <p style="font-size: 11px; margin-top: 5px; color: #aaa;">Vous pouvez révoquer ce consentement à tout moment via les boutons en bas de page.</p>
         <div class="rgpd-actions">
-            <button id="btn-decline-save" class="danger" aria-label="Refuser et continuer sans sauvegarde">Refuser</button>
+            <button id="btn-decline-save" class="danger" aria-label="Refuser la sauvegarde locale">Refuser</button>
             <button id="btn-accept-save" aria-label="Accepter la sauvegarde locale">Accepter</button>
         </div>
     </div>
 
     <main>
-        <h1>RPG - L'Éveil</h1>
+        <h1>🌿 RPG - L'éveil 🌿</h1>
         
         <div id="game-container" aria-label="Zone de jeu interactive" role="application">
             <!-- Phaser injects canvas here -->
@@ -250,8 +270,17 @@
         <section class="controls-panel" aria-labelledby="controls-title">
             <h2 id="controls-title" class="sr-only">Commandes du jeu et options</h2>
             <div class="controls" aria-hidden="true">
-                <p>Déplacement : [Z,Q,S,D] | Attaque : [ESPACE] | Interagir : [E]</p>
-                <p>Menu : [I] Inventaire | [J] Quêtes | [C] Crafting</p>
+                <div>
+                    <span>Déplacement :</span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd>
+                    <span style="margin-left: 15px;">Attaque :</span><kbd>Espace</kbd>
+                    <span style="margin-left: 15px;">Interagir :</span><kbd>E</kbd>
+                </div>
+                <div style="margin-top: 10px;">
+                    <span>Menu :</span><kbd>I</kbd>
+                    <span style="margin-left: 15px;">Inventaire :</span><kbd>J</kbd>
+                    <span style="margin-left: 15px;">Quêtes :</span><kbd>C</kbd>
+                    <span style="margin-left: 15px;">Crafting :</span><kbd>K</kbd>
+                </div>
             </div>
             
             <div class="footer-actions">
@@ -262,6 +291,202 @@
     </main>
     
     <!-- Scripts of the game scenes and classes -->
+    <script src="src/data/config.js"></script>
+    <script src="src/managers/AudioManager.js"></script>
+    <script src="src/managers/GameManager.js"></script>
+    <script src="src/classes/Player.js"></script>
+    <script src="src/classes/Enemy.js"></script>
+    <script src="src/maps/maps.js"></script>
+    <script src="src/scenes/WorldScene.js"></script>
+            line-height: 2.5;
+            text-shadow: 1px 1px 0 #000;
+            margin: 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .controls span {
+            margin-right: 5px;
+        }
+
+        kbd {
+            display: inline-block;
+            padding: 4px 8px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #d4af37;
+            background-color: #0c151c;
+            border: 2px solid #b89947;
+            border-radius: 4px;
+            box-shadow: 2px 2px 0 #000;
+            margin: 0 4px;
+        }
+
+        .footer-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            background-color: var(--btn-bg);
+            color: #fff;
+            border: 2px solid #fff;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background-color: var(--btn-hover);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button:focus-visible {
+            outline: var(--focus-outline);
+            outline-offset: 4px;
+        }
+        
+        button.danger {
+            background-color: var(--btn-danger);
+        }
+
+        button.danger:hover {
+            background-color: var(--btn-danger-hover);
+        }
+
+        button.secondary {
+            background-color: transparent;
+            color: #ccc;
+            border-color: #777;
+        }
+
+        button.secondary:hover {
+            background-color: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.02); }
+        }
+
+        /* RGPD Banner Styles */
+        #rgpd-dialog {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 600px;
+            background-color: var(--bg-color);
+            color: #fff;
+            padding: 20px;
+            z-index: 100;
+            display: none; /* hidden by default */
+            font-family: sans-serif;
+            font-size: 15px;
+            box-sizing: border-box;
+            border: 2px solid #fff;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            line-height: 1.5;
+        }
+
+        #rgpd-dialog[aria-hidden="false"] {
+            display: block;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { bottom: -100px; opacity: 0; }
+            to { bottom: 20px; opacity: 1; }
+        }
+
+        .rgpd-header {
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 10px;
+            display: block;
+            color: var(--accent-secondary);
+        }
+
+        .rgpd-actions {
+            margin-top: 15px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        /* Utility to visually hide elements but keep them accessible */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- ARIA Live Region pour les annonces du lecteur d'écran (ex: objets ramassés, quêtes) -->
+    <div id="aria-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <div id="rgpd-dialog" role="dialog" aria-labelledby="rgpd-title" aria-describedby="rgpd-desc" aria-hidden="true" aria-modal="true" tabindex="-1">
+        <span id="rgpd-title" class="rgpd-header">Paramètres de confidentialité</span>
+        <p id="rgpd-desc">Ce jeu utilise le stockage local de votre navigateur (`localStorage`) **exclusivement** pour sauvegarder votre progression en local (inventaire, niveau, quêtes). Aucune donnée personnelle (nom, email, IP) n'est collectée, analysée, ni partagée avec des tiers. Autorisez-vous la sauvegarde de votre progression ?</p>
+        <p style="font-size: 11px; margin-top: 5px; color: #aaa;">Vous pouvez révoquer ce consentement à tout moment via les boutons en bas de page.</p>
+        <div class="rgpd-actions">
+            <button id="btn-decline-save" class="danger" aria-label="Refuser la sauvegarde locale">Refuser</button>
+            <button id="btn-accept-save" aria-label="Accepter la sauvegarde locale">Accepter</button>
+        </div>
+    </div>
+
+    <main>
+        <h1>🌿 RPG - L'éveil 🌿</h1>
+        
+        <div id="game-container" aria-label="Zone de jeu interactive" role="application">
+            <!-- Phaser injects canvas here -->
+        </div>
+        
+        <section class="controls-panel" aria-labelledby="controls-title">
+            <h2 id="controls-title" class="sr-only">Commandes du jeu et options</h2>
+            <div class="controls" aria-hidden="true">
+                <div>
+                    <span>Déplacement :</span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd>
+                    <span style="margin-left: 15px;">Attaque :</span><kbd>Espace</kbd>
+                    <span style="margin-left: 15px;">Interagir :</span><kbd>E</kbd>
+                </div>
+                <div style="margin-top: 10px;">
+                    <span>Menu :</span><kbd>I</kbd>
+                    <span style="margin-left: 15px;">Inventaire :</span><kbd>J</kbd>
+                    <span style="margin-left: 15px;">Quêtes :</span><kbd>C</kbd>
+                    <span style="margin-left: 15px;">Crafting :</span><kbd>K</kbd>
+                </div>
+            </div>
+            
+            <div class="footer-actions">
+                <button id="btn-manage-data" class="secondary" aria-haspopup="dialog">Gérer mes données (RGPD)</button>
+                <button id="btn-delete-save" class="danger">Effacer ma sauvegarde</button>
+            </div>
+        </section>
+    </main>
+    
+    <!-- Scripts of the game scenes and classes -->
+    <script src="src/data/config.js"></script>
     <script src="src/managers/AudioManager.js"></script>
     <script src="src/managers/GameManager.js"></script>
     <script src="src/classes/Player.js"></script>
@@ -275,59 +500,68 @@
     <!-- Main game configuration -->
     <script src="main.js"></script>
     <script>
-        // Gestion RGPD améliorée et accessible
-        document.addEventListener('DOMContentLoaded', () => {
-            const dialog = document.getElementById('rgpd-dialog');
-            const btnAccept = document.getElementById('btn-accept-save');
-            const btnDecline = document.getElementById('btn-decline-save');
-            const btnManage = document.getElementById('btn-manage-data');
-            const btnDeleteSave = document.getElementById('btn-delete-save');
-            
-            const consentKey = 'rpg_save_consent';
-            const saveKey = 'rpg_save_v1';
-            
-            // Focus trap utils for accessibility
-            let previousFocus = null;
-
-            const openDialog = () => {
-                previousFocus = document.activeElement;
-                dialog.setAttribute('aria-hidden', 'false');
-                btnAccept.focus();
-            };
-
-            const closeDialog = () => {
-                dialog.setAttribute('aria-hidden', 'true');
-                if (previousFocus) previousFocus.focus();
-            };
-
-            // Check initial state
-            const currentConsent = localStorage.getItem(consentKey);
-            if (!currentConsent) {
-                // Delay slightly to ensure screen readers announce the page title first
-                setTimeout(openDialog, 500);
+        // --- Accessibilité (Screen Reader) ---
+        window.announce = function(message) {
+            const liveRegion = document.getElementById('aria-live-region');
+            if (liveRegion) {
+                liveRegion.textContent = message;
+                // Timeout to allow the screen reader to catch repeated identical messages
+                setTimeout(() => { if (liveRegion.textContent === message) liveRegion.textContent = ''; }, 3000);
             }
-            
-            btnAccept.addEventListener('click', () => {
-                localStorage.setItem(consentKey, 'true');
-                closeDialog();
-                if (window.gameState) window.gameState.save(); // Save immediately if game is running
-            });
-            
-            btnDecline.addEventListener('click', () => {
-                localStorage.setItem(consentKey, 'false');
-                localStorage.removeItem(saveKey);
-                closeDialog();
-            });
-            
-            btnManage.addEventListener('click', openDialog);
-            
-            btnDeleteSave.addEventListener('click', () => {
-                if(confirm("Êtes-vous sûr de vouloir supprimer définitivement votre sauvegarde ? L'action est irréversible.")) {
-                    localStorage.removeItem(saveKey);
-                    alert("Sauvegarde supprimée.");
-                    window.location.reload();
-                }
-            });
+        };
+
+        // --- RGPD & Save Management ---
+        const rgpdDialog = document.getElementById('rgpd-dialog');
+        const btnAccept = document.getElementById('btn-accept-save');
+        const btnDecline = document.getElementById('btn-decline-save');
+        const btnManage = document.getElementById('btn-manage-data');
+        const btnDelete = document.getElementById('btn-delete-save');
+
+        // Focus trap for modal
+        let previouslyFocusedElement = null;
+
+        function showRgpdDialog() {
+            previouslyFocusedElement = document.activeElement;
+            rgpdDialog.style.display = 'flex';
+            rgpdDialog.setAttribute('aria-hidden', 'false');
+            rgpdDialog.focus();
+            window.announce("Boîte de dialogue des paramètres de confidentialité ouverte.");
+        }
+
+        function hideRgpdDialog() {
+            rgpdDialog.style.display = 'none';
+            rgpdDialog.setAttribute('aria-hidden', 'true');
+            if (previouslyFocusedElement) previouslyFocusedElement.focus();
+        }
+
+        if (localStorage.getItem('rpg_save_consent') === null) {
+            showRgpdDialog();
+        }
+
+        btnAccept.addEventListener('click', () => {
+            localStorage.setItem('rpg_save_consent', 'true');
+            hideRgpdDialog();
+            window.announce("Sauvegarde locale autorisée.");
+            if (window.gameState) window.gameState.save();
+        });
+
+        btnDecline.addEventListener('click', () => {
+            localStorage.setItem('rpg_save_consent', 'false');
+            hideRgpdDialog();
+            window.announce("Sauvegarde locale refusée. Les données ne seront pas conservées après la fermeture.");
+        });
+
+        btnManage.addEventListener('click', () => {
+            showRgpdDialog();
+        });
+
+        btnDelete.addEventListener('click', () => {
+            if (confirm("Voulez-vous vraiment effacer votre sauvegarde ? Cette action est irréversible.")) {
+                localStorage.removeItem('rpg_save_v1');
+                alert("Sauvegarde effacée.");
+                window.announce("La sauvegarde a été effacée avec succès.");
+                if (window.gameState) window.gameState.reset();
+            }
         });
     </script>
 </body>

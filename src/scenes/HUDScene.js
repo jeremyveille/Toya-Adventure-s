@@ -9,15 +9,26 @@ class HUDScene extends Phaser.Scene {
 
         // 1. Barre de dialogue
         this.dialogueBox = this.add.graphics();
-        this.dialogueBox.fillStyle(0x000000, 0.8);
-        this.dialogueBox.lineStyle(4, 0xffffff);
-        this.dialogueBox.fillRect(100, 450, 600, 130);
-        this.dialogueBox.strokeRect(100, 450, 600, 130);
-        this.dialogueText = this.add.text(120, 470, "", { fontSize: '14px', fontFamily: '"Press Start 2P", monospace', color: '#fff', wordWrap: { width: 560 } });
-        this.dialogueName = this.add.text(110, 430, "", { fontSize: '16px', fontFamily: '"Press Start 2P", monospace', color: '#ffcc00' });
-        this.dialogueInfo = this.add.text(500, 550, "[Espace] pour continuer", { fontSize: '10px', fontFamily: '"Press Start 2P", monospace', color: '#aaa' });
+        this.dialogueBox.fillStyle(0x0c151c, 0.95);
+        this.dialogueBox.lineStyle(3, 0xb89947); // Gold border
+        this.dialogueBox.fillRoundedRect(100, 430, 600, 130, 8);
+        this.dialogueBox.strokeRoundedRect(100, 430, 600, 130, 8);
         
-        this.dialogueGroup = this.add.group([this.dialogueBox, this.dialogueText, this.dialogueName, this.dialogueInfo]);
+        // Boîte du nom
+        this.dialogueNameBox = this.add.graphics();
+        this.dialogueNameBox.fillStyle(0x0c151c, 1);
+        this.dialogueNameBox.lineStyle(3, 0xb89947);
+        this.dialogueNameBox.fillRoundedRect(120, 410, 140, 40, 4);
+        this.dialogueNameBox.strokeRoundedRect(120, 410, 140, 40, 4);
+
+        this.dialogueName = this.add.text(130, 422, "", { fontSize: '16px', fontFamily: '"Press Start 2P", monospace', color: '#ffd700' });
+        this.dialogueText = this.add.text(125, 460, "", { fontSize: '14px', fontFamily: '"Press Start 2P", monospace', color: '#ffffff', wordWrap: { width: 550 }, lineSpacing: 8 });
+        
+        // Triangle clignotant
+        this.dialogueIndicator = this.add.triangle(670, 540, 0, 0, 14, 0, 7, 10, 0xffffff);
+        this.tweens.add({ targets: this.dialogueIndicator, alpha: 0.2, duration: 500, yoyo: true, repeat: -1 });
+
+        this.dialogueGroup = this.add.group([this.dialogueBox, this.dialogueNameBox, this.dialogueName, this.dialogueText, this.dialogueIndicator]);
         this.dialogueGroup.setVisible(false);
         this.isDialogueActive = false;
 
@@ -93,16 +104,29 @@ class HUDScene extends Phaser.Scene {
     }
 
     showDialogue(npcName, text, callback) {
-        this.isDialogueActive = true;
-        
-        // Animation d'apparition
-        this.dialogueGroup.setAlpha(0);
         this.dialogueGroup.setVisible(true);
-        this.tweens.add({ targets: this.dialogueGroup.getChildren(), alpha: 1, duration: 200, ease: 'Power2' });
-        
         this.dialogueName.setText(npcName);
-        this.dialogueText.setText(text);
+        this.dialogueText.setText("");
+        this.isDialogueActive = true;
         this.dialogueCallback = callback;
+
+        if (window.announce) {
+            window.announce(`${npcName} dit : ${text}. Appuyez sur Espace pour continuer.`);
+        }
+
+        // Animation machine à écrire
+        let i = 0;
+        this.typewriterEvent = this.time.addEvent({
+            delay: 30, // vitesse
+            callback: () => {
+                this.dialogueText.setText(this.dialogueText.text + text[i]);
+                i++;
+                if(i === text.length) {
+                    this.typewriterEvent.remove();
+                }
+            },
+            repeat: text.length - 1
+        });
 
         // On bloque le joueur
         const worldScene = this.scene.get('WorldScene');
