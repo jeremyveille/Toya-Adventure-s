@@ -104,8 +104,14 @@ function runTests() {
         assert.strictEqual(gm.player.hp, 120);
     });
 
-    console.log(`\nTests terminés : ${passed} succès, ${failed} échecs.`);
-    process.exit(failed > 0 ? 1 : 0);
+    console.log(`\nTests unitaires legacy terminés : ${passed} succès, ${failed} échecs.`);
+    if (failed > 0) {
+        process.exit(1);
+    }
+    
+    // Lancement de la suite de tests 2.5D complète
+    console.log("\nLancement de la suite 4-Tier 2.5D RPG...\n");
+    require('./test_25d_suite.js');
 }
 
 runTests();
