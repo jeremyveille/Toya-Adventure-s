@@ -5,8 +5,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         scene.physics.add.existing(this);
 
         this.setScale(0.15); // Adapté à la taille des spritesheets IA (~1024px)
+        this.setOrigin(0.5, 0.95); // Ancrage 2.5D au sol (aux pieds)
         this.setCollideWorldBounds(true);
-        this.body.setSize(150, 150); // Ajustement de la hitbox physique 
+
+        // Hitbox 2.5D restreinte strictement à l'empreinte au sol des pieds (~18x10 px monde)
+        // Coordonnées locales du frame 341x256 : pieds à Y=247, centre X=170.5
+        this.body.setSize(120, 67);
+        this.body.setOffset(111, 180);
 
         // Statistiques
         this.hp = 100;
@@ -50,6 +55,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     update() {
+        // Garde 2.5D : bloque les mouvements pendant les dialogues ou la mort
+        if (!this.active) {
+            this.setVelocity(0);
+            return;
+        }
+
         if (this.isAttacking) {
             this.setVelocity(0); // On ne bouge pas pendant qu'on donne un coup d'épée
             return;
@@ -90,6 +101,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
             isMoving = true;
         }
 
+        // Normalisation de la vitesse diagonale (éviter d'aller plus vite en diagonale)
+        if (this.body.velocity.x !== 0 && this.body.velocity.y !== 0) {
+            this.body.velocity.normalize().scale(currentSpeed);
+        }
+
         if (!isMoving) {
             this.anims.stop();
             // Retour au frame de repos
@@ -99,27 +115,27 @@ class Player extends Phaser.Physics.Arcade.Sprite {
             if(this.facing === 'up') this.setFrame(10);
         }
 
-        // Mise à jour de la zone d'interaction
-        const offset = 40;
+        // Mise à jour de la zone d'interaction (calibrée sur les pieds 2.5D)
+        const offset = 35;
         this.interactionHitbox.x = this.x + (this.facing === 'right' ? offset : this.facing === 'left' ? -offset : 0);
-        this.interactionHitbox.y = this.y + (this.facing === 'down' ? offset : this.facing === 'up' ? -offset : 0);
+        this.interactionHitbox.y = (this.y - 12) + (this.facing === 'down' ? offset : this.facing === 'up' ? -offset : 0);
 
         // Gestion de l'attaque Espace (Mode Zelda)
         if (Phaser.Input.Keyboard.JustDown(this.spaceBar)) {
             this.performActionAttack();
         }
 
-        // Depth sorting
-        this.setDepth(this.y);
+        // Depth sorting unifié 2.5D au point de contact au sol (pieds)
+        this.setDepth(Math.floor(this.y));
     }
 
     performActionAttack() {
         this.isAttacking = true;
         
         // On positionne la hitbox devant le joueur selon sa direction
-        const offset = 60;
+        const offset = 40;
         this.weaponHitbox.x = this.x + (this.facing === 'right' ? offset : this.facing === 'left' ? -offset : 0);
-        this.weaponHitbox.y = this.y + (this.facing === 'down' ? offset : this.facing === 'up' ? -offset : 0);
+        this.weaponHitbox.y = (this.y - 12) + (this.facing === 'down' ? offset : this.facing === 'up' ? -offset : 0);
         
         this.weaponHitbox.body.setEnable(true);
 
@@ -134,6 +150,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         slash.strokePath();
 
         slash.setPosition(this.weaponHitbox.x, this.weaponHitbox.y);
+        slash.setDepth(this.depth + 1);
         
         // Orientation de base selon la direction
         let baseRotation = 0;

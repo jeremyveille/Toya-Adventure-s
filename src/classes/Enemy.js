@@ -4,12 +4,18 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         scene.add.existing(this);
         scene.physics.add.existing(this);
 
-        // "minor" = Acton RPG | "major" = Boss Tour-par-Tour
+        // "minor" = Action RPG | "major" = Boss Tour-par-Tour
         this.enemyType = type; 
 
         this.setScale(0.12);
+        this.setOrigin(0.5, 0.95); // Ancrage 2.5D au sol (aux pieds)
         this.setCollideWorldBounds(true);
         this.setImmovable(true);
+
+        // Hitbox 2.5D restreinte strictement à l'empreinte au sol (~36x18 px monde)
+        // Texture 1024x1024 : 300x150 px texture centrée aux pieds
+        this.body.setSize(300, 150);
+        this.body.setOffset(362, 850);
 
         this.hp = type === 'minor' ? 30 : 100;
         this.isFlashing = false;
@@ -45,22 +51,24 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
 
     preUpdate(time, delta) {
         super.preUpdate(time, delta);
-        this.setDepth(this.y);
+        // Depth sorting unifié 2.5D aux pieds
+        this.setDepth(Math.floor(this.y));
     }
 
     shootAtPlayer() {
         if (this.hp <= 0 || !this.scene || !this.scene.player) return;
         
         let dx = this.scene.player.x - this.x;
-        let dy = this.scene.player.y - this.y;
+        let dy = (this.scene.player.y - 15) - (this.y - 20);
         
         // Tire seulement si proche (max 400px)
         if (dx*dx + dy*dy > 400*400) return;
         
         let vec = new Phaser.Math.Vector2(dx, dy).normalize().scale(250);
-        let bullet = this.scene.add.circle(this.x, this.y, 8, 0xff0000);
+        let bullet = this.scene.add.circle(this.x, this.y - 20, 8, 0xff0000);
         this.scene.physics.add.existing(bullet);
         bullet.body.setVelocity(vec.x, vec.y);
+        bullet.setDepth(Math.floor(this.y) + 10);
         
         this.scene.time.delayedCall(2000, () => {
             if (bullet && bullet.active) bullet.destroy();
@@ -108,6 +116,10 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
     die() {
         if(this.moveEvent) this.moveEvent.remove();
         if(this.shootEvent) this.shootEvent.remove();
+        if(this.shadow) {
+            this.shadow.destroy();
+            this.shadow = null;
+        }
         
         // Gain XP et Gold
         if(this.scene && window.gameState) {
@@ -117,13 +129,15 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
             window.gameState.save();
 
             // Textes flottants pour XP et Gold
-            let xpText = this.scene.add.text(this.x, this.y - 20, "+20 XP\n+5 Gold", { fontSize: '14px', fontFamily: '"Press Start 2P"', color: '#ffff00', align: 'center' }).setOrigin(0.5);
-            this.scene.tweens.add({ targets: xpText, y: this.y - 60, alpha: 0, duration: 1500, onComplete: () => xpText.destroy() });
+            let xpText = this.scene.add.text(this.x, this.y - 40, "+20 XP\n+5 Gold", { fontSize: '14px', fontFamily: '"Press Start 2P"', color: '#ffff00', align: 'center' }).setOrigin(0.5);
+            xpText.setDepth(9002);
+            this.scene.tweens.add({ targets: xpText, y: this.y - 80, alpha: 0, duration: 1500, onComplete: () => xpText.destroy() });
 
             // Feedback Level Up
             if (leveledUp && this.scene.player) {
-                let lvlText = this.scene.add.text(this.scene.player.x, this.scene.player.y - 50, "LEVEL UP!", { fontSize: '20px', fontFamily: '"Press Start 2P"', color: '#00ff00', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5);
-                this.scene.tweens.add({ targets: lvlText, y: this.scene.player.y - 100, alpha: 0, duration: 2500, onComplete: () => lvlText.destroy() });
+                let lvlText = this.scene.add.text(this.scene.player.x, this.scene.player.y - 60, "LEVEL UP!", { fontSize: '20px', fontFamily: '"Press Start 2P"', color: '#00ff00', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5);
+                lvlText.setDepth(9002);
+                this.scene.tweens.add({ targets: lvlText, y: this.scene.player.y - 110, alpha: 0, duration: 2500, onComplete: () => lvlText.destroy() });
                 this.scene.cameras.main.flash(500, 255, 255, 255); // Flash blanc de niveau
                 if (window.audioManager.play) window.audioManager.play('levelup');
             }
@@ -131,7 +145,8 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
 
         // Petite explosion particule basique
         for(let i=0; i<5; i++){
-            let p = this.scene.add.rectangle(this.x, this.y, 10, 10, 0xff0000);
+            let p = this.scene.add.rectangle(this.x, this.y - 15, 10, 10, 0xff0000);
+            p.setDepth(Math.floor(this.y) + 5);
             this.scene.physics.add.existing(p);
             p.body.setVelocity(Phaser.Math.Between(-100,100), Phaser.Math.Between(-100,100));
             this.scene.tweens.add({ targets: p, alpha: 0, duration: 500, onComplete: () => p.destroy() });
