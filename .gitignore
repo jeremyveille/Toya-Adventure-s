@@ -1,0 +1,12 @@
+# Agent / Editor artifacts
+.agents/
+.claude/
+.kilo/
+.gemini/
+
+# Dependency directories
+node_modules/
+
+# OS metadata
+.DS_Store
+Thumbs.db
