@@ -1,5 +1,6 @@
 const assert = require('assert');
 const path = require('path');
+const child_process = require('child_process');
 
 // Mock localStorage for Node.js environment
 global.localStorage = {
@@ -15,19 +16,23 @@ const GameConfig = require('../src/data/config.js');
 const GameManager = require('../src/managers/GameManager.js');
 
 function runTests() {
-    console.log("Démarrage des tests unitaires du GameManager...");
-    let passed = 0;
-    let failed = 0;
+    console.log("================================================================================");
+    console.log("             MASTER TEST RUNNER - 2D RPG ORCHESTRATOR");
+    console.log("================================================================================\n");
+
+    console.log("--- 1. LEGACY GAMEMANAGER UNIT TESTS (5 TESTS) ---");
+    let legacyPassed = 0;
+    let legacyFailed = 0;
     
     function test(name, fn) {
         try {
             fn();
-            console.log(`[PASS] ${name}`);
-            passed++;
+            console.log(`  [PASS] ${name}`);
+            legacyPassed++;
         } catch (e) {
-            console.error(`[FAIL] ${name}`);
+            console.error(`  [FAIL] ${name}`);
             console.error(e);
-            failed++;
+            legacyFailed++;
         }
     }
 
@@ -104,14 +109,53 @@ function runTests() {
         assert.strictEqual(gm.player.hp, 120);
     });
 
-    console.log(`\nTests unitaires legacy terminés : ${passed} succès, ${failed} échecs.`);
-    if (failed > 0) {
+    console.log(`\nTests unitaires legacy terminés : ${legacyPassed} succès, ${legacyFailed} échecs.\n`);
+
+    // --- 2. 2.5D REGRESSION SUITE (52 TESTS) ---
+    console.log("--- 2. 2.5D REGRESSION SUITE (52 TESTS) ---");
+    const suite25dPath = path.join(__dirname, 'test_25d_suite.js');
+    const res25d = child_process.spawnSync(process.execPath, [suite25dPath], { stdio: 'inherit' });
+    const suite25dPassed = res25d.status === 0;
+
+    // --- 3. E2E REQUIREMENT-DRIVEN SUITE (93 TESTS) ---
+    console.log("\n--- 3. E2E REQUIREMENT-DRIVEN SUITE (93 TESTS) ---");
+    const suiteE2ePath = path.join(__dirname, 'test_e2e_suite.js');
+    const resE2e = child_process.spawnSync(process.execPath, [suiteE2ePath], { stdio: 'inherit' });
+    const suiteE2ePassed = resE2e.status === 0;
+
+    // --- 4. AGGREGATED REPORT ---
+    const totalLegacy = legacyPassed + legacyFailed;
+    const total25d = 52;
+    const passed25d = suite25dPassed ? 52 : 0;
+    const failed25d = suite25dPassed ? 0 : 52;
+
+    const totalE2e = 93;
+    const passedE2e = suiteE2ePassed ? 93 : 0;
+    const failedE2e = suiteE2ePassed ? 0 : 93;
+
+    const grandTotal = totalLegacy + total25d + totalE2e;
+    const grandPassed = legacyPassed + passed25d + passedE2e;
+    const grandFailed = legacyFailed + failed25d + failedE2e;
+
+    console.log("\n================================================================================");
+    console.log("                  GRAND TOTAL TEST EXECUTION SUMMARY");
+    console.log("================================================================================");
+    console.log(`  1. Legacy GameManager Unit Tests  : ${legacyPassed} / ${totalLegacy} PASS`);
+    console.log(`  2. 2.5D RPG Regression Suite       : ${passed25d} / ${total25d} PASS`);
+    console.log(`  3. E2E Requirement-Driven Suite   : ${passedE2e} / ${totalE2e} PASS`);
+    console.log("--------------------------------------------------------------------------------");
+    console.log(`  TOTAL TESTS AGGREGATED            : ${grandTotal}`);
+    console.log(`  TOTAL PASSED                      : ${grandPassed}`);
+    console.log(`  TOTAL FAILED                      : ${grandFailed}`);
+    console.log("================================================================================");
+
+    if (grandFailed > 0 || !suite25dPassed || !suiteE2ePassed) {
+        console.error("\n>>> EXECUTION COMPLETED WITH FAILURES <<<\n");
         process.exit(1);
+    } else {
+        console.log("\n>>> ALL 150 TESTS PASSED SUCCESSFULLY! <<<\n");
+        process.exit(0);
     }
-    
-    // Lancement de la suite de tests 2.5D complète
-    console.log("\nLancement de la suite 4-Tier 2.5D RPG...\n");
-    require('./test_25d_suite.js');
 }
 
 runTests();

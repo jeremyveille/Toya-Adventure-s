@@ -3,9 +3,13 @@ class BattleScene extends Phaser.Scene {
         super('BattleScene');
     }
 
+    preload() {
+        this.load.image('battle_bg', 'assets/ui/battle_bg.png');
+    }
+
     create() {
         // Fond de combat, style Toriyama (désert/forêt simplifiée)
-        this.add.image(0, 0, 'tiles').setOrigin(0,0).setScale(1.5).setTint(0x777777); // Assombrit
+        this.bgImage = this.add.image(0, 0, 'battle_bg').setOrigin(0,0).setScale(1.5).setTint(0x777777); // Assombrit
         this.cameras.main.fadeIn(500, 255, 255, 255); // Le flash de transition
 
         // Joueur : on utilise la frame où il regarde à droite (Frame 7 ou 8)
@@ -189,6 +193,15 @@ class BattleScene extends Phaser.Scene {
     }
 
     endBattle() {
+        if (this.enemyHp <= 0 && window.gameState && typeof window.gameState.addItem === 'function') {
+            window.gameState.addItem({
+                id: 'boss_trophy',
+                name: 'Trophée Ancien',
+                qty: 1,
+                iconKey: 'item_trophy'
+            });
+        }
+
         // Sauvegarder les HPs restants
         window.gameState.player.hp = this.playerHp;
         window.gameState.player.mp = this.playerMp;

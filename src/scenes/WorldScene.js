@@ -1095,6 +1095,9 @@ class WorldScene extends Phaser.Scene {
     }
 
     startBossBattle(player, boss) {
+        if ((window.gameState && window.gameState.player && window.gameState.player.hp <= 0) || (player && player.hp <= 0)) {
+            return;
+        }
         boss.destroy();
         this.cameras.main.fadeOut(500, 255, 255, 255);
         this.time.delayedCall(500, () => {
