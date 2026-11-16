@@ -65,6 +65,30 @@ class WorldScene extends Phaser.Scene {
     preload() {
         this.load.spritesheet('hero', 'assets/hero_spritesheet.png', { frameWidth: 341, frameHeight: 256 });
         this.load.image('enemy', 'assets/enemy.png');
+
+        let _preloadAssets = (typeof preloadSceneAssets === 'function')
+            ? preloadSceneAssets
+            : (typeof window !== 'undefined' && typeof window.preloadSceneAssets === 'function')
+                ? window.preloadSceneAssets
+                : null;
+        if (!_preloadAssets && typeof require === 'function') {
+            try {
+                _preloadAssets = require('../data/assets.js').preloadSceneAssets;
+            } catch (e1) {
+                try {
+                    _preloadAssets = require('./src/data/assets.js').preloadSceneAssets;
+                } catch (e2) {
+                    try {
+                        _preloadAssets = require('../src/data/assets.js').preloadSceneAssets;
+                    } catch (e3) {
+                        _preloadAssets = null;
+                    }
+                }
+            }
+        }
+        if (_preloadAssets) {
+            _preloadAssets(this, ['character', 'prop', 'vfx', 'monster']);
+        }
     }
 
     create() {
@@ -489,8 +513,10 @@ class WorldScene extends Phaser.Scene {
         shadow.setScale(1.2, 0.8);
         shadow.setDepth(baseDepth - 0.5);
 
-        let sprite = this.add.sprite(cx, cy + ts * 0.25, 'tex_npc');
-        sprite.setOrigin(0.5, 0.9);
+        let textureKey = (data && (data.texture || data.key)) || 
+                         (data && (data.name === 'Elder' || data.name === 'Ancien' || data.id === 'npc_elder') ? 'npc_elder' : 'npc_guide');
+        let sprite = this.add.sprite(cx, cy + ts * 0.25, textureKey);
+        sprite.setOrigin(0.5, 0.90);
         sprite.setDepth(baseDepth);
         
         let indicator = this.add.text(cx, cy - ts * 0.6, "!", {
@@ -506,6 +532,7 @@ class WorldScene extends Phaser.Scene {
         let zone = this.add.zone(cx, cy, ts * 1.5, ts * 1.5);
         this.physics.add.existing(zone, true);
         zone.npcData = data;
+        zone.sprite = sprite;
         this.interactiveZones.add(zone);
     }
 
@@ -607,324 +634,355 @@ class WorldScene extends Phaser.Scene {
 
     generateTextures(ts) {
         // --- 1. Ombre au sol (tex_shadow) ---
-        let gShadow = this.make.graphics({x:0, y:0, add:false});
-        gShadow.fillStyle(0x000000, 0.35);
-        gShadow.fillEllipse(16, 10, 30, 16);
-        gShadow.generateTexture('tex_shadow', 32, 20);
+        if (!this.textures.exists('tex_shadow')) {
+            let gShadow = this.make.graphics({x:0, y:0, add:false});
+            gShadow.fillStyle(0x000000, 0.35);
+            gShadow.fillEllipse(16, 10, 30, 16);
+            gShadow.generateTexture('tex_shadow', 32, 20);
+        }
 
         // --- 2. Grand Arbre 2.5D (tex_tree : 128x160 px) ---
-        let gTree = this.make.graphics({x:0, y:0, add:false});
-        let tw = 128, th = 160;
-        
-        // Tronc noueux en bois foncé
-        gTree.fillStyle(0x382214); // Ombre du tronc
-        gTree.fillRect(tw/2 - 14, 80, 28, 70);
-        gTree.fillStyle(0x4a2e1b); // Corps du tronc
-        gTree.fillRect(tw/2 - 10, 80, 20, 70);
-        // Racines évasées
-        gTree.fillRect(tw/2 - 20, 136, 10, 14);
-        gTree.fillRect(tw/2 + 10, 136, 10, 14);
-        gTree.fillStyle(0x2d7a2d); // Mousse au pied
-        gTree.fillRect(tw/2 - 12, 140, 6, 8);
-        gTree.fillRect(tw/2 + 6, 142, 6, 6);
+        if (!this.textures.exists('tex_tree')) {
+            let gTree = this.make.graphics({x:0, y:0, add:false});
+            let tw = 128, th = 160;
+            
+            // Tronc noueux en bois foncé
+            gTree.fillStyle(0x382214); // Ombre du tronc
+            gTree.fillRect(tw/2 - 14, 80, 28, 70);
+            gTree.fillStyle(0x4a2e1b); // Corps du tronc
+            gTree.fillRect(tw/2 - 10, 80, 20, 70);
+            // Racines évasées
+            gTree.fillRect(tw/2 - 20, 136, 10, 14);
+            gTree.fillRect(tw/2 + 10, 136, 10, 14);
+            gTree.fillStyle(0x2d7a2d); // Mousse au pied
+            gTree.fillRect(tw/2 - 12, 140, 6, 8);
+            gTree.fillRect(tw/2 + 6, 142, 6, 6);
 
-        // Canopée volumétrique 3 couches (Akira Toriyama pixel art)
-        // Couche 1: Vert très sombre (arrière et dessous)
-        gTree.fillStyle(0x1b431b);
-        gTree.fillCircle(tw/2, 50, 48);
-        gTree.fillCircle(tw/2 - 26, 60, 30);
-        gTree.fillCircle(tw/2 + 26, 60, 30);
-        
-        // Couche 2: Vert moyen riche
-        gTree.fillStyle(0x2d7a2d);
-        gTree.fillCircle(tw/2, 44, 40);
-        gTree.fillCircle(tw/2 - 22, 54, 24);
-        gTree.fillCircle(tw/2 + 22, 54, 24);
-        
-        // Couche 3: Vert clair ensoleillé (haut et face avant)
-        gTree.fillStyle(0x52b752);
-        gTree.fillCircle(tw/2, 34, 30);
-        gTree.fillCircle(tw/2 - 16, 44, 18);
-        gTree.fillCircle(tw/2 + 16, 44, 18);
-        
-        // Reflet jaune/vert vif sur la couronne
-        gTree.fillStyle(0x8ae645);
-        gTree.fillCircle(tw/2 - 8, 24, 14);
-        gTree.fillCircle(tw/2 + 10, 26, 10);
-        gTree.generateTexture('tex_tree', tw, th);
+            // Canopée volumétrique 3 couches (Akira Toriyama pixel art)
+            // Couche 1: Vert très sombre (arrière et dessous)
+            gTree.fillStyle(0x1b431b);
+            gTree.fillCircle(tw/2, 50, 48);
+            gTree.fillCircle(tw/2 - 26, 60, 30);
+            gTree.fillCircle(tw/2 + 26, 60, 30);
+            
+            // Couche 2: Vert moyen riche
+            gTree.fillStyle(0x2d7a2d);
+            gTree.fillCircle(tw/2, 44, 40);
+            gTree.fillCircle(tw/2 - 22, 54, 24);
+            gTree.fillCircle(tw/2 + 22, 54, 24);
+            
+            // Couche 3: Vert clair ensoleillé (haut et face avant)
+            gTree.fillStyle(0x52b752);
+            gTree.fillCircle(tw/2, 34, 30);
+            gTree.fillCircle(tw/2 - 16, 44, 18);
+            gTree.fillCircle(tw/2 + 16, 44, 18);
+            
+            // Reflet jaune/vert vif sur la couronne
+            gTree.fillStyle(0x8ae645);
+            gTree.fillCircle(tw/2 - 8, 24, 14);
+            gTree.fillCircle(tw/2 + 10, 26, 10);
+            gTree.generateTexture('tex_tree', tw, th);
+        }
 
         // --- 3. Petit Arbre 2.5D (tex_tree_small : 64x96 px) ---
-        let gSTree = this.make.graphics({x:0, y:0, add:false});
-        let stw = 64, sth = 96;
-        gSTree.fillStyle(0x382214);
-        gSTree.fillRect(stw/2 - 6, 52, 12, 38);
-        gSTree.fillStyle(0x4a2e1b);
-        gSTree.fillRect(stw/2 - 4, 52, 8, 38);
-        
-        gSTree.fillStyle(0x1b431b);
-        gSTree.fillCircle(stw/2, 34, 26);
-        gSTree.fillStyle(0x2d7a2d);
-        gSTree.fillCircle(stw/2, 30, 22);
-        gSTree.fillStyle(0x52b752);
-        gSTree.fillCircle(stw/2, 24, 16);
-        gSTree.fillStyle(0x8ae645);
-        gSTree.fillCircle(stw/2 - 4, 18, 8);
-        gSTree.generateTexture('tex_tree_small', stw, sth);
+        if (!this.textures.exists('tex_tree_small')) {
+            let gSTree = this.make.graphics({x:0, y:0, add:false});
+            let stw = 64, sth = 96;
+            gSTree.fillStyle(0x382214);
+            gSTree.fillRect(stw/2 - 6, 52, 12, 38);
+            gSTree.fillStyle(0x4a2e1b);
+            gSTree.fillRect(stw/2 - 4, 52, 8, 38);
+            
+            gSTree.fillStyle(0x1b431b);
+            gSTree.fillCircle(stw/2, 34, 26);
+            gSTree.fillStyle(0x2d7a2d);
+            gSTree.fillCircle(stw/2, 30, 22);
+            gSTree.fillStyle(0x52b752);
+            gSTree.fillCircle(stw/2, 24, 16);
+            gSTree.fillStyle(0x8ae645);
+            gSTree.fillCircle(stw/2 - 4, 18, 8);
+            gSTree.generateTexture('tex_tree_small', stw, sth);
+        }
 
         // --- 4. Buisson 2.5D (tex_bush : 64x64 px) ---
-        let gBush = this.make.graphics({x:0, y:0, add:false});
-        gBush.fillStyle(0x1b431b);
-        gBush.fillCircle(32, 36, 22);
-        gBush.fillStyle(0x2e7d32);
-        gBush.fillCircle(32, 32, 18);
-        gBush.fillStyle(0x4caf50);
-        gBush.fillCircle(30, 26, 12);
-        // Baies rouges
-        gBush.fillStyle(0xe53935);
-        gBush.fillRect(24, 24, 4, 4);
-        gBush.fillRect(36, 28, 4, 4);
-        gBush.fillRect(28, 38, 4, 4);
-        gBush.fillRect(40, 36, 4, 4);
-        gBush.generateTexture('tex_bush', ts, ts);
+        if (!this.textures.exists('tex_bush')) {
+            let gBush = this.make.graphics({x:0, y:0, add:false});
+            gBush.fillStyle(0x1b431b);
+            gBush.fillCircle(32, 36, 22);
+            gBush.fillStyle(0x2e7d32);
+            gBush.fillCircle(32, 32, 18);
+            gBush.fillStyle(0x4caf50);
+            gBush.fillCircle(30, 26, 12);
+            // Baies rouges
+            gBush.fillStyle(0xe53935);
+            gBush.fillRect(24, 24, 4, 4);
+            gBush.fillRect(36, 28, 4, 4);
+            gBush.fillRect(28, 38, 4, 4);
+            gBush.fillRect(40, 36, 4, 4);
+            gBush.generateTexture('tex_bush', ts, ts);
+        }
 
         // --- 5. Falaise Volumétrique 2.5D (tex_cliff : 64x64 px) ---
-        let gCliff = this.make.graphics({x:0, y:0, add:false});
-        // Plateau supérieur herbeux
-        gCliff.fillStyle(0x5c9e2b);
-        gCliff.fillRect(0, 0, ts, 16);
-        gCliff.fillStyle(0x78c028); // Liseré herbe vive
-        gCliff.fillRect(0, 14, ts, 3);
-        // Franges d'herbe qui retombent
-        gCliff.fillStyle(0x46821a);
-        gCliff.fillRect(4, 16, 6, 5);
-        gCliff.fillRect(20, 16, 8, 6);
-        gCliff.fillRect(42, 16, 6, 4);
-        gCliff.fillRect(54, 16, 6, 7);
+        if (!this.textures.exists('tex_cliff')) {
+            let gCliff = this.make.graphics({x:0, y:0, add:false});
+            // Plateau supérieur herbeux
+            gCliff.fillStyle(0x5c9e2b);
+            gCliff.fillRect(0, 0, ts, 16);
+            gCliff.fillStyle(0x78c028); // Liseré herbe vive
+            gCliff.fillRect(0, 14, ts, 3);
+            // Franges d'herbe qui retombent
+            gCliff.fillStyle(0x46821a);
+            gCliff.fillRect(4, 16, 6, 5);
+            gCliff.fillRect(20, 16, 8, 6);
+            gCliff.fillRect(42, 16, 6, 4);
+            gCliff.fillRect(54, 16, 6, 7);
 
-        // Paroi rocheuse verticale avec strates horizontales
-        gCliff.fillStyle(0x616161); // Base pierre grise
-        gCliff.fillRect(0, 20, ts, ts - 20);
-        gCliff.fillStyle(0x424242); // Strate sombre et fissures
-        gCliff.fillRect(0, 32, ts, 4);
-        gCliff.fillRect(16, 36, 8, 12);
-        gCliff.fillRect(40, 26, 12, 8);
-        gCliff.fillRect(0, 52, ts, 4);
-        gCliff.fillStyle(0x9e9e9e); // Arêtes et reflets
-        gCliff.fillRect(0, 22, ts, 2);
-        gCliff.fillRect(12, 30, 16, 2);
-        gCliff.fillRect(36, 48, 20, 2);
-        gCliff.generateTexture('tex_cliff', ts, ts);
+            // Paroi rocheuse verticale avec strates horizontales
+            gCliff.fillStyle(0x616161); // Base pierre grise
+            gCliff.fillRect(0, 20, ts, ts - 20);
+            gCliff.fillStyle(0x424242); // Strate sombre et fissures
+            gCliff.fillRect(0, 32, ts, 4);
+            gCliff.fillRect(16, 36, 8, 12);
+            gCliff.fillRect(40, 26, 12, 8);
+            gCliff.fillRect(0, 52, ts, 4);
+            gCliff.fillStyle(0x9e9e9e); // Arêtes et reflets
+            gCliff.fillRect(0, 22, ts, 2);
+            gCliff.fillRect(12, 30, 16, 2);
+            gCliff.fillRect(36, 48, 20, 2);
+            gCliff.generateTexture('tex_cliff', ts, ts);
+        }
 
         // --- 6. Chalet Fantasy 2.5D (tex_house : 192x240 px) ---
-        let gHouse = this.make.graphics({x:0, y:0, add:false});
-        let hw = ts * 3; // 192 px
-        let hh = ts * 3 + 48; // 240 px
+        if (!this.textures.exists('tex_house')) {
+            let gHouse = this.make.graphics({x:0, y:0, add:false});
+            let hw = ts * 3; // 192 px
+            let hh = ts * 3 + 48; // 240 px
 
-        // Cheminée en pierre sur la droite
-        gHouse.fillStyle(0x607d8b);
-        gHouse.fillRect(hw - 36, 16, 22, 70);
-        gHouse.fillStyle(0x37474f); // Briques
-        gHouse.fillRect(hw - 36, 28, 22, 3);
-        gHouse.fillRect(hw - 36, 46, 22, 3);
-        gHouse.fillRect(hw - 36, 64, 22, 3);
-        gHouse.fillStyle(0x263238); // Chapeau de cheminée
-        gHouse.fillRect(hw - 40, 12, 30, 6);
+            // Cheminée en pierre sur la droite
+            gHouse.fillStyle(0x607d8b);
+            gHouse.fillRect(hw - 36, 16, 22, 70);
+            gHouse.fillStyle(0x37474f); // Briques
+            gHouse.fillRect(hw - 36, 28, 22, 3);
+            gHouse.fillRect(hw - 36, 46, 22, 3);
+            gHouse.fillRect(hw - 36, 64, 22, 3);
+            gHouse.fillStyle(0x263238); // Chapeau de cheminée
+            gHouse.fillRect(hw - 40, 12, 30, 6);
 
-        // Toit en bâtière 3/4 perspective (tuiles terre cuite)
-        // Rangées de tuiles rouges / orange
-        gHouse.fillStyle(0xc0392b);
-        gHouse.fillRect(12, 30, hw - 24, 76);
-        gHouse.fillStyle(0xd35400);
-        gHouse.fillRect(16, 44, hw - 32, 10);
-        gHouse.fillRect(14, 64, hw - 28, 10);
-        gHouse.fillRect(12, 84, hw - 24, 10);
-        gHouse.fillStyle(0xba4a00); // Lignes d'ombre des tuiles
-        gHouse.fillRect(12, 54, hw - 24, 3);
-        gHouse.fillRect(12, 74, hw - 24, 3);
-        gHouse.fillRect(12, 94, hw - 24, 3);
-        // Faîtage éclairé
-        gHouse.fillStyle(0xf39c12);
-        gHouse.fillRect(8, 26, hw - 16, 6);
+            // Toit en bâtière 3/4 perspective (tuiles terre cuite)
+            // Rangées de tuiles rouges / orange
+            gHouse.fillStyle(0xc0392b);
+            gHouse.fillRect(12, 30, hw - 24, 76);
+            gHouse.fillStyle(0xd35400);
+            gHouse.fillRect(16, 44, hw - 32, 10);
+            gHouse.fillRect(14, 64, hw - 28, 10);
+            gHouse.fillRect(12, 84, hw - 24, 10);
+            gHouse.fillStyle(0xba4a00); // Lignes d'ombre des tuiles
+            gHouse.fillRect(12, 54, hw - 24, 3);
+            gHouse.fillRect(12, 74, hw - 24, 3);
+            gHouse.fillRect(12, 94, hw - 24, 3);
+            // Faîtage éclairé
+            gHouse.fillStyle(0xf39c12);
+            gHouse.fillRect(8, 26, hw - 16, 6);
 
-        // Débord d'avant-toit et ombre portée sur la façade
-        gHouse.fillStyle(0x4a2e1b);
-        gHouse.fillRect(6, 102, hw - 12, 6);
-        gHouse.fillStyle(0x1a0f0a); // Ombre sous le toit
-        gHouse.fillRect(8, 108, hw - 16, 8);
+            // Débord d'avant-toit et ombre portée sur la façade
+            gHouse.fillStyle(0x4a2e1b);
+            gHouse.fillRect(6, 102, hw - 12, 6);
+            gHouse.fillStyle(0x1a0f0a); // Ombre sous le toit
+            gHouse.fillRect(8, 108, hw - 16, 8);
 
-        // Façade à colombages (panneaux crème et poutres en chêne foncé)
-        gHouse.fillStyle(0xfef9e7); // Plâtre crème
-        gHouse.fillRect(12, 114, hw - 24, 106);
+            // Façade à colombages (panneaux crème et poutres en chêne foncé)
+            gHouse.fillStyle(0xfef9e7); // Plâtre crème
+            gHouse.fillRect(12, 114, hw - 24, 106);
 
-        // Poutres verticales et horizontales
-        gHouse.fillStyle(0x4e342e);
-        gHouse.fillRect(12, 114, 8, 106); // Poutre gauche
-        gHouse.fillRect(hw - 20, 114, 8, 106); // Poutre droite
-        gHouse.fillRect(12, 160, hw - 24, 8); // Poutre intermédiaire
-        // Poutres diagonales (croix de Saint-André)
-        gHouse.fillRect(40, 114, 8, 46);
-        gHouse.fillRect(hw - 48, 114, 8, 46);
+            // Poutres verticales et horizontales
+            gHouse.fillStyle(0x4e342e);
+            gHouse.fillRect(12, 114, 8, 106); // Poutre gauche
+            gHouse.fillRect(hw - 20, 114, 8, 106); // Poutre droite
+            gHouse.fillRect(12, 160, hw - 24, 8); // Poutre intermédiaire
+            // Poutres diagonales (croix de Saint-André)
+            gHouse.fillRect(40, 114, 8, 46);
+            gHouse.fillRect(hw - 48, 114, 8, 46);
 
-        // Fenêtres illuminées (lumière intérieure dorée chaleureuse)
-        // Fenêtre gauche
-        gHouse.fillStyle(0x5d4037); // Volets
-        gHouse.fillRect(24, 126, 4, 24);
-        gHouse.fillRect(46, 126, 4, 24);
-        gHouse.fillStyle(0xffca28); // Vitre allumée
-        gHouse.fillRect(28, 126, 18, 24);
-        gHouse.fillStyle(0xfff9c4);
-        gHouse.fillRect(30, 128, 6, 8);
-        gHouse.fillStyle(0x3e2723); // Croisillons
-        gHouse.fillRect(36, 126, 2, 24);
-        gHouse.fillRect(28, 137, 18, 2);
+            // Fenêtres illuminées (lumière intérieure dorée chaleureuse)
+            // Fenêtre gauche
+            gHouse.fillStyle(0x5d4037); // Volets
+            gHouse.fillRect(24, 126, 4, 24);
+            gHouse.fillRect(46, 126, 4, 24);
+            gHouse.fillStyle(0xffca28); // Vitre allumée
+            gHouse.fillRect(28, 126, 18, 24);
+            gHouse.fillStyle(0xfff9c4);
+            gHouse.fillRect(30, 128, 6, 8);
+            gHouse.fillStyle(0x3e2723); // Croisillons
+            gHouse.fillRect(36, 126, 2, 24);
+            gHouse.fillRect(28, 137, 18, 2);
 
-        // Fenêtre droite
-        gHouse.fillStyle(0x5d4037);
-        gHouse.fillRect(hw - 50, 126, 4, 24);
-        gHouse.fillRect(hw - 28, 126, 4, 24);
-        gHouse.fillStyle(0xffca28);
-        gHouse.fillRect(hw - 46, 126, 18, 24);
-        gHouse.fillStyle(0xfff9c4);
-        gHouse.fillRect(hw - 44, 128, 6, 8);
-        gHouse.fillStyle(0x3e2723);
-        gHouse.fillRect(hw - 38, 126, 2, 24);
-        gHouse.fillRect(hw - 46, 137, 18, 2);
+            // Fenêtre droite
+            gHouse.fillStyle(0x5d4037);
+            gHouse.fillRect(hw - 50, 126, 4, 24);
+            gHouse.fillRect(hw - 28, 126, 4, 24);
+            gHouse.fillStyle(0xffca28);
+            gHouse.fillRect(hw - 46, 126, 18, 24);
+            gHouse.fillStyle(0xfff9c4);
+            gHouse.fillRect(hw - 44, 128, 6, 8);
+            gHouse.fillStyle(0x3e2723);
+            gHouse.fillRect(hw - 38, 126, 2, 24);
+            gHouse.fillRect(hw - 46, 137, 18, 2);
 
-        // Porte d'entrée en bois avec ferrures
-        gHouse.fillStyle(0x6d4c41);
-        gHouse.fillRect(hw/2 - 16, 168, 32, 52);
-        gHouse.fillStyle(0x4e342e); // Lattes verticales
-        gHouse.fillRect(hw/2 - 6, 168, 2, 52);
-        gHouse.fillRect(hw/2 + 6, 168, 2, 52);
-        gHouse.fillStyle(0x111111); // Poignée et gonds
-        gHouse.fillRect(hw/2 + 8, 192, 4, 6);
-        gHouse.fillRect(hw/2 - 14, 174, 6, 3);
-        gHouse.fillRect(hw/2 - 14, 206, 6, 3);
+            // Porte d'entrée en bois avec ferrures
+            gHouse.fillStyle(0x6d4c41);
+            gHouse.fillRect(hw/2 - 16, 168, 32, 52);
+            gHouse.fillStyle(0x4e342e); // Lattes verticales
+            gHouse.fillRect(hw/2 - 6, 168, 2, 52);
+            gHouse.fillRect(hw/2 + 6, 168, 2, 52);
+            gHouse.fillStyle(0x111111); // Poignée et gonds
+            gHouse.fillRect(hw/2 + 8, 192, 4, 6);
+            gHouse.fillRect(hw/2 - 14, 174, 6, 3);
+            gHouse.fillRect(hw/2 - 14, 206, 6, 3);
 
-        // Soubassement en pierre de taille
-        gHouse.fillStyle(0x78909c);
-        gHouse.fillRect(10, 220, hw - 20, 16);
-        gHouse.fillStyle(0x455a64);
-        gHouse.fillRect(10, 226, hw - 20, 2);
-        gHouse.fillRect(40, 220, 2, 16);
-        gHouse.fillRect(90, 220, 2, 16);
-        gHouse.fillRect(140, 220, 2, 16);
-        gHouse.generateTexture('tex_house', hw, hh);
+            // Soubassement en pierre de taille
+            gHouse.fillStyle(0x78909c);
+            gHouse.fillRect(10, 220, hw - 20, 16);
+            gHouse.fillStyle(0x455a64);
+            gHouse.fillRect(10, 226, hw - 20, 2);
+            gHouse.fillRect(40, 220, 2, 16);
+            gHouse.fillRect(90, 220, 2, 16);
+            gHouse.fillRect(140, 220, 2, 16);
+            gHouse.generateTexture('tex_house', hw, hh);
+        }
 
         // --- 7. Ruine Antique 2.5D (tex_ruin : 64x80 px) ---
-        let gRuin = this.make.graphics({x:0, y:0, add:false});
-        gRuin.fillStyle(0x424242);
-        gRuin.fillRect(12, 16, 40, 60);
-        gRuin.fillStyle(0x757575);
-        gRuin.fillRect(16, 16, 32, 60);
-        // Cannelures de colonne
-        gRuin.fillStyle(0x9e9e9e);
-        gRuin.fillRect(20, 22, 4, 48);
-        gRuin.fillRect(28, 22, 4, 48);
-        gRuin.fillRect(36, 22, 4, 48);
-        // Chapiteau et fissures
-        gRuin.fillStyle(0xbdbdbd);
-        gRuin.fillRect(10, 12, 44, 8);
-        gRuin.fillStyle(0x212121);
-        gRuin.fillRect(24, 34, 12, 4);
-        gRuin.fillRect(32, 38, 4, 10);
-        // Lierre grimpant
-        gRuin.fillStyle(0x2e7d32);
-        gRuin.fillRect(14, 42, 6, 6);
-        gRuin.fillRect(16, 54, 8, 6);
-        gRuin.fillRect(38, 58, 6, 6);
-        gRuin.generateTexture('tex_ruin', ts, ts + 16);
+        if (!this.textures.exists('tex_ruin')) {
+            let gRuin = this.make.graphics({x:0, y:0, add:false});
+            gRuin.fillStyle(0x424242);
+            gRuin.fillRect(12, 16, 40, 60);
+            gRuin.fillStyle(0x757575);
+            gRuin.fillRect(16, 16, 32, 60);
+            // Cannelures de colonne
+            gRuin.fillStyle(0x9e9e9e);
+            gRuin.fillRect(20, 22, 4, 48);
+            gRuin.fillRect(28, 22, 4, 48);
+            gRuin.fillRect(36, 22, 4, 48);
+            // Chapiteau et fissures
+            gRuin.fillStyle(0xbdbdbd);
+            gRuin.fillRect(10, 12, 44, 8);
+            gRuin.fillStyle(0x212121);
+            gRuin.fillRect(24, 34, 12, 4);
+            gRuin.fillRect(32, 38, 4, 10);
+            // Lierre grimpant
+            gRuin.fillStyle(0x2e7d32);
+            gRuin.fillRect(14, 42, 6, 6);
+            gRuin.fillRect(16, 54, 8, 6);
+            gRuin.fillRect(38, 58, 6, 6);
+            gRuin.generateTexture('tex_ruin', ts, ts + 16);
+        }
 
         // --- 8. Petite Ruine / Rocher 2.5D (tex_ruin_small : 64x48 px) ---
-        let gRock = this.make.graphics({x:0, y:0, add:false});
-        gRock.fillStyle(0x424242);
-        gRock.fillCircle(32, 26, 18);
-        gRock.fillStyle(0x757575);
-        gRock.fillCircle(30, 24, 15);
-        gRock.fillStyle(0x9e9e9e);
-        gRock.fillCircle(26, 20, 9);
-        gRock.fillStyle(0x2e7d32); // Mousse
-        gRock.fillRect(28, 28, 8, 4);
-        gRock.generateTexture('tex_ruin_small', ts, 48);
+        if (!this.textures.exists('tex_ruin_small')) {
+            let gRock = this.make.graphics({x:0, y:0, add:false});
+            gRock.fillStyle(0x424242);
+            gRock.fillCircle(32, 26, 18);
+            gRock.fillStyle(0x757575);
+            gRock.fillCircle(30, 24, 15);
+            gRock.fillStyle(0x9e9e9e);
+            gRock.fillCircle(26, 20, 9);
+            gRock.fillStyle(0x2e7d32); // Mousse
+            gRock.fillRect(28, 28, 8, 4);
+            gRock.generateTexture('tex_ruin_small', ts, 48);
+        }
 
         // --- 9. Panneau indicateur 2.5D (tex_sign) ---
-        let gSign = this.make.graphics({x:0, y:0, add:false});
-        gSign.fillStyle(0x4a2e1b);
-        gSign.fillRect(ts/2 - 4, 28, 8, 32);
-        gSign.fillStyle(0x8a6235);
-        gSign.fillRect(ts/2 - 18, 14, 36, 16);
-        gSign.fillStyle(0x3a2512); // Flèche gravée
-        gSign.fillRect(ts/2 - 10, 20, 16, 3);
-        gSign.fillRect(ts/2 + 6, 18, 3, 7);
-        gSign.generateTexture('tex_sign', ts, ts);
+        if (!this.textures.exists('tex_sign')) {
+            let gSign = this.make.graphics({x:0, y:0, add:false});
+            gSign.fillStyle(0x4a2e1b);
+            gSign.fillRect(ts/2 - 4, 28, 8, 32);
+            gSign.fillStyle(0x8a6235);
+            gSign.fillRect(ts/2 - 18, 14, 36, 16);
+            gSign.fillStyle(0x3a2512); // Flèche gravée
+            gSign.fillRect(ts/2 - 10, 20, 16, 3);
+            gSign.fillRect(ts/2 + 6, 18, 3, 7);
+            gSign.generateTexture('tex_sign', ts, ts);
+        }
 
         // --- 10. Clôture 2.5D (tex_fence) ---
-        let gFence = this.make.graphics({x:0, y:0, add:false});
-        gFence.fillStyle(0x4e342e);
-        gFence.fillRect(8, 16, 8, 44);
-        gFence.fillRect(ts - 16, 16, 8, 44);
-        gFence.fillStyle(0x8a6235);
-        gFence.fillRect(4, 24, ts - 8, 6);
-        gFence.fillRect(4, 40, ts - 8, 6);
-        gFence.generateTexture('tex_fence', ts, ts);
+        if (!this.textures.exists('tex_fence')) {
+            let gFence = this.make.graphics({x:0, y:0, add:false});
+            gFence.fillStyle(0x4e342e);
+            gFence.fillRect(8, 16, 8, 44);
+            gFence.fillRect(ts - 16, 16, 8, 44);
+            gFence.fillStyle(0x8a6235);
+            gFence.fillRect(4, 24, ts - 8, 6);
+            gFence.fillRect(4, 40, ts - 8, 6);
+            gFence.generateTexture('tex_fence', ts, ts);
+        }
 
         // --- 11. Coffre au trésor 2.5D (tex_chest_closed / opened) ---
-        let gChest = this.make.graphics({x:0, y:0, add:false});
-        gChest.fillStyle(0x5d4037);
-        gChest.fillRect(14, 20, 36, 28);
-        gChest.fillStyle(0x8d6e63);
-        gChest.fillRect(16, 22, 32, 24);
-        // Ferrures dorées et serrure
-        gChest.fillStyle(0xffb300);
-        gChest.fillRect(14, 30, 36, 4);
-        gChest.fillRect(30, 30, 6, 10);
-        gChest.fillStyle(0x000000);
-        gChest.fillRect(32, 34, 2, 4);
-        gChest.generateTexture('tex_chest_closed', ts, ts);
+        if (!this.textures.exists('tex_chest_closed')) {
+            let gChest = this.make.graphics({x:0, y:0, add:false});
+            gChest.fillStyle(0x5d4037);
+            gChest.fillRect(14, 20, 36, 28);
+            gChest.fillStyle(0x8d6e63);
+            gChest.fillRect(16, 22, 32, 24);
+            // Ferrures dorées et serrure
+            gChest.fillStyle(0xffb300);
+            gChest.fillRect(14, 30, 36, 4);
+            gChest.fillRect(30, 30, 6, 10);
+            gChest.fillStyle(0x000000);
+            gChest.fillRect(32, 34, 2, 4);
+            gChest.generateTexture('tex_chest_closed', ts, ts);
+        }
 
-        let gChestO = this.make.graphics({x:0, y:0, add:false});
-        gChestO.fillStyle(0x5d4037);
-        gChestO.fillRect(14, 26, 36, 24);
-        gChestO.fillStyle(0x211005); // Intérieur sombre
-        gChestO.fillRect(18, 28, 28, 12);
-        // Couvercle relevé en 3D
-        gChestO.fillStyle(0x8d6e63);
-        gChestO.fillRect(14, 12, 36, 12);
-        gChestO.fillStyle(0xffb300);
-        gChestO.fillRect(14, 16, 36, 3);
-        gChestO.generateTexture('tex_chest_opened', ts, ts);
+        if (!this.textures.exists('tex_chest_opened')) {
+            let gChestO = this.make.graphics({x:0, y:0, add:false});
+            gChestO.fillStyle(0x5d4037);
+            gChestO.fillRect(14, 26, 36, 24);
+            gChestO.fillStyle(0x211005); // Intérieur sombre
+            gChestO.fillRect(18, 28, 28, 12);
+            // Couvercle relevé en 3D
+            gChestO.fillStyle(0x8d6e63);
+            gChestO.fillRect(14, 12, 36, 12);
+            gChestO.fillStyle(0xffb300);
+            gChestO.fillRect(14, 16, 36, 3);
+            gChestO.generateTexture('tex_chest_opened', ts, ts);
+        }
 
-        // --- 12. PNJ Cristal 2.5D (tex_npc) ---
-        let gNpc = this.make.graphics({x:0, y:0, add:false});
-        // Socle en pierre ornée
-        gNpc.fillStyle(0x455a64);
-        gNpc.fillRect(16, 40, 32, 16);
-        gNpc.fillStyle(0x78909c);
-        gNpc.fillRect(18, 38, 28, 4);
-        // Cristal cyan flottant
-        gNpc.fillStyle(0x00e5ff);
-        gNpc.fillRect(26, 12, 12, 22);
-        gNpc.fillRect(28, 6, 8, 34);
-        gNpc.fillStyle(0xffffff); // Reflet
-        gNpc.fillRect(30, 10, 4, 14);
-        gNpc.generateTexture('tex_npc', ts, ts);
+        // --- 12. PNJ Cristal 2.5D (tex_npc / npc_guide) ---
+        if (!this.textures.exists('tex_npc') && !this.textures.exists('npc_guide')) {
+            let gNpc = this.make.graphics({x:0, y:0, add:false});
+            // Socle en pierre ornée
+            gNpc.fillStyle(0x455a64);
+            gNpc.fillRect(16, 40, 32, 16);
+            gNpc.fillStyle(0x78909c);
+            gNpc.fillRect(18, 38, 28, 4);
+            // Cristal cyan flottant
+            gNpc.fillStyle(0x00e5ff);
+            gNpc.fillRect(26, 12, 12, 22);
+            gNpc.fillRect(28, 6, 8, 34);
+            gNpc.fillStyle(0xffffff); // Reflet
+            gNpc.fillRect(30, 10, 4, 14);
+            gNpc.generateTexture('tex_npc', ts, ts);
+            gNpc.generateTexture('npc_guide', ts, ts);
+        }
 
         // --- 13. Particule feuille (tex_leaf) ---
-        let gLeaf = this.make.graphics({x:0, y:0, add:false});
-        gLeaf.fillStyle(0x7cb342, 0.9);
-        gLeaf.fillRect(0, 0, 6, 6);
-        gLeaf.generateTexture('tex_leaf', 6, 6);
+        if (!this.textures.exists('tex_leaf')) {
+            let gLeaf = this.make.graphics({x:0, y:0, add:false});
+            gLeaf.fillStyle(0x7cb342, 0.9);
+            gLeaf.fillRect(0, 0, 6, 6);
+            gLeaf.generateTexture('tex_leaf', 6, 6);
+        }
 
         // --- 14. Mur intérieur (tex_wall) ---
-        let gWall = this.make.graphics({x:0, y:0, add:false});
-        gWall.fillStyle(0x4e342e);
-        gWall.fillRect(0, 0, ts, ts);
-        gWall.fillStyle(0x3e2723);
-        gWall.fillRect(0, ts - 8, ts, 8);
-        gWall.fillStyle(0x6d4c41);
-        gWall.fillRect(0, 16, ts, 2);
-        gWall.fillRect(0, 36, ts, 2);
-        gWall.generateTexture('tex_wall', ts, ts);
+        if (!this.textures.exists('tex_wall')) {
+            let gWall = this.make.graphics({x:0, y:0, add:false});
+            gWall.fillStyle(0x4e342e);
+            gWall.fillRect(0, 0, ts, ts);
+            gWall.fillStyle(0x3e2723);
+            gWall.fillRect(0, ts - 8, ts, 8);
+            gWall.fillStyle(0x6d4c41);
+            gWall.fillRect(0, 16, ts, 2);
+            gWall.fillRect(0, 36, ts, 2);
+            gWall.generateTexture('tex_wall', ts, ts);
+        }
     }
 
     handleInteraction(playerHitbox, interactiveZone) {
