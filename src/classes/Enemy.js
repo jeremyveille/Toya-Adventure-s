@@ -7,21 +7,32 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         // "minor" = Action RPG | "major" = Boss Tour-par-Tour
         this.enemyType = type; 
 
-        this.setScale(0.12);
+        // Hitbox et échelle 2.5D calibrées selon la texture et le type
+        if (texture === 'enemy') {
+            this.setScale(0.12);
+            this.body.setSize(300, 150);
+            this.body.setOffset(362, 850);
+        } else if (texture === 'monster_boss' || type === 'major') {
+            this.setScale(1.0);
+            this.body.setSize(72, 36);
+            this.body.setOffset(28, 86);
+        } else {
+            // Texture découpée mineure (ex: monster_slime, monster_shooter, 64x64 px)
+            this.setScale(1.0);
+            this.body.setSize(36, 18);
+            this.body.setOffset(14, 43);
+        }
+
         this.setOrigin(0.5, 0.95); // Ancrage 2.5D au sol (aux pieds)
         this.setCollideWorldBounds(true);
         this.setImmovable(true);
 
-        // Hitbox 2.5D restreinte strictement à l'empreinte au sol (~36x18 px monde)
-        // Texture 1024x1024 : 300x150 px texture centrée aux pieds
-        this.body.setSize(300, 150);
-        this.body.setOffset(362, 850);
-
-        this.hp = type === 'minor' ? 30 : 100;
+        this.hp = (type === 'minor' || type === 'slime_charger') ? 30 : 100;
         this.isFlashing = false;
+        this.isDead = false;
 
-        // Mouvement aléatoire simple
-        if(this.enemyType === 'minor' || this.enemyType === 'shooter') {
+        // Mouvement aléatoire / IA charger
+        if(this.enemyType === 'minor' || this.enemyType === 'shooter' || this.enemyType === 'slime_charger' || this.enemyType === 'goblin_shooter') {
             this.moveEvent = scene.time.addEvent({
                 delay: 2000,
                 callback: this.randomWander,
@@ -31,7 +42,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         }
 
         // Tir pour le shooter
-        if (this.enemyType === 'shooter') {
+        if (this.enemyType === 'shooter' || this.enemyType === 'goblin_shooter') {
             this.setTint(0x00ffff); // Cyan
             this.shootEvent = scene.time.addEvent({
                 delay: 3000,
@@ -43,7 +54,25 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
     }
 
     randomWander() {
-        if(this.isFlashing) return; // Ne bouge pas quand on prend un coup
+        if(this.isFlashing || this.isDead) return; // Ne bouge pas quand on prend un coup ou mort
+
+        // IA Charger : fonce vers le joueur s'il est proche (< 180px)
+        const player = this.scene && this.scene.player;
+        const isPlayerAlive = player && (player.active !== false) &&
+            (!window.gameState || !window.gameState.player || window.gameState.player.hp > 0) &&
+            (player.hp === undefined || player.hp > 0);
+
+        if (isPlayerAlive && (this.enemyType === 'minor' || this.enemyType === 'slime_charger')) {
+            const dx = player.x - this.x;
+            const dy = player.y - this.y;
+            const distSq = dx * dx + dy * dy;
+            if (distSq < 180 * 180 && distSq > 0.001) {
+                let vec = new Phaser.Math.Vector2(dx, dy).normalize().scale(110);
+                this.setVelocity(vec.x, vec.y);
+                return;
+            }
+        }
+
         const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [0,0]];
         const dir = Phaser.Utils.Array.GetRandom(directions);
         this.setVelocity(dir[0] * 50, dir[1] * 50);
@@ -78,7 +107,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
             if (b && b.active) b.destroy();
             window.gameState.player.hp -= 10;
             this.scene.cameras.main.shake(100, 0.01);
-            if (window.audioManager.play) window.audioManager.play('hit');
+            if (window.audioManager && window.audioManager.play) window.audioManager.play('hit');
             // Effet rouge sur le joueur
             p.setTint(0xff0000);
             this.scene.time.delayedCall(200, () => p.clearTint());
@@ -86,7 +115,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
     }
 
     takeDamage(amount) {
-        if (this.isFlashing) return; // Invincibilité temporaire
+        if (this.isFlashing || this.isDead) return; // Invincibilité temporaire ou déjà mort
 
         this.hp -= amount;
         this.isFlashing = true;
@@ -94,8 +123,10 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         // Effet de dégat
         this.setTint(0xff0000);
         this.scene.time.delayedCall(300, () => {
-            this.clearTint();
-            this.isFlashing = false;
+            if (this.active) {
+                this.clearTint();
+                this.isFlashing = false;
+            }
         });
 
         // Knockback (repousse en arrière depuis le joueur)
@@ -114,6 +145,9 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
     }
 
     die() {
+        if (this.isDead) return;
+        this.isDead = true;
+
         if(this.moveEvent) this.moveEvent.remove();
         if(this.shootEvent) this.shootEvent.remove();
         if(this.shadow) {
@@ -139,7 +173,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
                 lvlText.setDepth(9002);
                 this.scene.tweens.add({ targets: lvlText, y: this.scene.player.y - 110, alpha: 0, duration: 2500, onComplete: () => lvlText.destroy() });
                 this.scene.cameras.main.flash(500, 255, 255, 255); // Flash blanc de niveau
-                if (window.audioManager.play) window.audioManager.play('levelup');
+                if (window.audioManager && window.audioManager.play) window.audioManager.play('levelup');
             }
         }
 

@@ -381,6 +381,20 @@ class WorldScene extends Phaser.Scene {
         this.physics.add.overlap(this.player.weaponHitbox, this.enemies, this.hitMinorEnemy, null, this);
         this.physics.add.overlap(this.player.weaponHitbox, this.resourceGroup, this.hitResource, null, this);
         this.physics.add.overlap(this.player, this.doorGroup, this.enterDoor, null, this);
+        this.physics.add.overlap(this.player, this.bossGroup, this.startBossBattle, null, this);
+
+        // Spawn boss si configuré sur la carte et non vaincu
+        if (this.currentMapData.bossData) {
+            const bossDefeated = window.gameState && window.gameState.inventory && window.gameState.inventory.some(i => i.id === 'boss_trophy');
+            if (!bossDefeated) {
+                this.createBoss(this.currentMapData.bossData, ts);
+            }
+        }
+
+        this.events.on('wake', () => {
+            this.isBossBattleTriggered = false;
+            this.cameras.main.fadeIn(500, 255, 255, 255);
+        });
 
         this.input.keyboard.on('keydown-E', () => {
             this.physics.overlap(this.player.interactionHitbox, this.interactiveZones, this.handleInteraction, null, this);
@@ -537,12 +551,46 @@ class WorldScene extends Phaser.Scene {
     }
 
     createEnemy(cx, cy, type) {
-        let enemy = new Enemy(this, cx, cy, 'enemy', type);
+        let tex = 'enemy';
+        if (type === 'shooter' || type === 'goblin_shooter') {
+            tex = (this.textures && typeof this.textures.exists === 'function' && this.textures.exists('monster_shooter')) ? 'monster_shooter' : 'enemy';
+        } else if (type === 'minor' || type === 'slime_charger') {
+            tex = (this.textures && typeof this.textures.exists === 'function' && this.textures.exists('monster_slime')) ? 'monster_slime' : 'enemy';
+        }
+        let enemy = new Enemy(this, cx, cy, tex, type);
         let shadow = this.add.sprite(cx, cy, 'tex_shadow');
         shadow.setScale(1.6, 1.0);
         shadow.setDepth(Math.floor(cy) - 0.5);
         enemy.shadow = shadow;
         this.enemies.add(enemy);
+        return enemy;
+    }
+
+    createBoss(data, ts) {
+        const tileSize = ts || (this.currentMapData && this.currentMapData.tileSize) || 64;
+        let bx, by, type, textureKey;
+        if (typeof data === 'object' && data !== null) {
+            bx = (data.x !== undefined) ? (data.x * tileSize + tileSize / 2) : 0;
+            by = (data.y !== undefined) ? (data.y * tileSize + tileSize / 2) : 0;
+            type = data.type || 'major';
+            textureKey = data.texture || 'monster_boss';
+        } else {
+            bx = arguments[0];
+            by = arguments[1];
+            type = arguments[2] || 'major';
+            textureKey = arguments[3] || 'monster_boss';
+        }
+        const tex = (this.textures && typeof this.textures.exists === 'function' && this.textures.exists(textureKey)) ? textureKey : 'enemy';
+        let boss = new Enemy(this, bx, by, tex, type);
+        let shadow = this.add.sprite(bx, by, 'tex_shadow');
+        shadow.setScale(2.4, 1.4);
+        shadow.setDepth(Math.floor(by) - 0.5);
+        boss.shadow = shadow;
+        if (typeof data === 'object' && data !== null) {
+            boss.bossData = data;
+        }
+        this.bossGroup.add(boss);
+        return boss;
     }
 
     createResource(cx, cy, ts, type) {
@@ -1041,6 +1089,20 @@ class WorldScene extends Phaser.Scene {
             }
         });
 
+        // Synchronisation des ombres des boss
+        if (this.bossGroup) {
+            this.bossGroup.getChildren().forEach(b => {
+                if (b.shadow && b.active) {
+                    b.shadow.setPosition(b.x, b.y);
+                    b.shadow.setDepth(Math.floor(b.y) - 0.5);
+                }
+                if ((b.hp <= 0 || !b.active) && b.shadow) {
+                    b.shadow.destroy();
+                    b.shadow = null;
+                }
+            });
+        }
+
         // Mise à jour de l'OcclusionManager (transparence dynamique des toits et canopées)
         if (this.occlusionManager) {
             this.occlusionManager.update(this.player);
@@ -1153,10 +1215,18 @@ class WorldScene extends Phaser.Scene {
     }
 
     startBossBattle(player, boss) {
+        if (this.isBossBattleTriggered) return;
         if ((window.gameState && window.gameState.player && window.gameState.player.hp <= 0) || (player && player.hp <= 0)) {
             return;
         }
-        boss.destroy();
+        this.isBossBattleTriggered = true;
+        if (boss && boss.shadow) {
+            boss.shadow.destroy();
+            boss.shadow = null;
+        }
+        if (boss && typeof boss.destroy === 'function') {
+            boss.destroy();
+        }
         this.cameras.main.fadeOut(500, 255, 255, 255);
         this.time.delayedCall(500, () => {
             this.scene.sleep();

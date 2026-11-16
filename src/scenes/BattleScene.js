@@ -5,6 +5,10 @@ class BattleScene extends Phaser.Scene {
 
     preload() {
         this.load.image('battle_bg', 'assets/ui/battle_bg.png');
+        this.load.image('monster_boss', 'assets/monsters/boss_guardian.png');
+        if (!this.textures || !this.textures.exists || !this.textures.exists('hero')) {
+            this.load.spritesheet('hero', 'assets/hero_spritesheet.png', { frameWidth: 341, frameHeight: 256 });
+        }
     }
 
     create() {
@@ -16,18 +20,26 @@ class BattleScene extends Phaser.Scene {
         this.playerSprite = this.add.sprite(150, 350, 'hero', 7);
         this.playerSprite.setScale(0.8);
         
-        // Ennemi (Le boss rose qu'on a touché)
-        this.enemySprite = this.add.sprite(650, 350, 'enemy');
-        this.enemySprite.setScale(0.5);
-        this.enemySprite.setTint(0xff00ff);
+        // Ennemi (Le boss)
+        const hasBossTex = (this.textures && typeof this.textures.exists === 'function' && this.textures.exists('monster_boss'));
+        this.isBossSliced = hasBossTex;
+        const bossTex = hasBossTex ? 'monster_boss' : 'enemy';
+        this.enemySprite = this.add.sprite(650, 350, bossTex);
+        if (hasBossTex) {
+            this.enemySprite.setScale(1.5);
+        } else {
+            this.enemySprite.setScale(0.5);
+            this.enemySprite.setTint(0xff00ff);
+        }
 
         // Stats du combat
-        let p = window.gameState.player;
+        let p = (window.gameState && window.gameState.player) ? window.gameState.player : { hp: 100, maxHp: 100, mp: 30, damage: 15 };
         this.playerHp = p.hp;
         this.playerMaxHp = p.maxHp;
         this.playerMp = p.mp; // Points de magie
         this.enemyHp = 200;
         this.enemyMaxHp = 200;
+        this.isDefending = false;
 
         // Émission initiale des stats vers l'UI
         this.time.delayedCall(10, () => {
@@ -67,7 +79,13 @@ class BattleScene extends Phaser.Scene {
                     this.showFloatingText(this.enemySprite.x, this.enemySprite.y - 50, `-${dmg}`, 0xffffff);
                     this.updateUIBars();
                     
-                    this.time.delayedCall(200, () => this.enemySprite.setTint(0xff00ff));
+                    this.time.delayedCall(200, () => {
+                        if (this.isBossSliced) {
+                            this.enemySprite.clearTint();
+                        } else {
+                            this.enemySprite.setTint(0xff00ff);
+                        }
+                    });
                 },
                 onComplete: () => this.time.delayedCall(1000, this.enemyTurn, [], this)
             });
@@ -94,7 +112,13 @@ class BattleScene extends Phaser.Scene {
                      this.updateUIBars();
                      this.enemySprite.setTintFill(0xffffff);
                      this.cameras.main.shake(300, 0.02);
-                     this.time.delayedCall(200, () => this.enemySprite.setTint(0xff00ff));
+                     this.time.delayedCall(200, () => {
+                         if (this.isBossSliced) {
+                             this.enemySprite.clearTint();
+                         } else {
+                             this.enemySprite.setTint(0xff00ff);
+                         }
+                     });
                      
                      this.time.delayedCall(1000, this.enemyTurn, [], this);
                 });
@@ -123,6 +147,33 @@ class BattleScene extends Phaser.Scene {
                 this.time.delayedCall(1500, this.enemyTurn, [], this);
             } else {
                 this.events.emit('Message', `Plus assez de Magie !`);
+                this.events.emit('EnableMenu');
+            }
+        } else if (action === 'defend') {
+            this.isDefending = true;
+            this.events.emit('Message', `Posture défensive !`);
+            this.time.delayedCall(1000, this.enemyTurn, [], this);
+        } else if (action === 'item' || action === 'potion') {
+            if (window.gameState && typeof window.gameState.useItem === 'function') {
+                const used = window.gameState.useItem('potion');
+                if (used) {
+                    this.playerHp = window.gameState.player.hp;
+                    this.updateUIBars();
+                    this.events.emit('Message', `Potion utilisée (+30 PV) !`);
+                    for (let i = 0; i < 15; i++) {
+                        let spark = this.add.circle(150 + Phaser.Math.Between(-30, 30), 350 + Phaser.Math.Between(0, 50), 10, 0x00ff00);
+                        this.tweens.add({
+                            targets: spark, y: spark.y - 100, alpha: 0, scale: 0.1, duration: 1000, onComplete: () => spark.destroy()
+                        });
+                    }
+                    this.showFloatingText(150, 350, `+30`, 0x00ff00);
+                    this.time.delayedCall(1500, this.enemyTurn, [], this);
+                } else {
+                    this.events.emit('Message', `Aucune Potion dans l'inventaire !`);
+                    this.events.emit('EnableMenu');
+                }
+            } else {
+                this.events.emit('Message', `Inventaire indisponible !`);
                 this.events.emit('EnableMenu');
             }
         } else if (action === 'flee') {
@@ -176,20 +227,26 @@ class BattleScene extends Phaser.Scene {
                 this.playerSprite.setTint(0xff0000);
                 this.time.delayedCall(200, () => this.playerSprite.clearTint());
 
-                let dmg = 30 + Phaser.Math.Between(-5, 5);
+                let baseDmg = 30 + Phaser.Math.Between(-5, 5);
+                let dmg = this.isDefending ? Math.floor(baseDmg / 2) : baseDmg;
+                this.isDefending = false;
                 this.playerHp -= dmg;
                 this.showFloatingText(this.playerSprite.x, this.playerSprite.y - 50, `-${dmg}`, 0xff0000);
                 this.updateUIBars();
 
                 if(this.playerHp <= 0) {
                     this.events.emit('Message', `Vous etes mort...`);
-                    this.time.delayedCall(2000, () => window.location.reload() );
+                    this.time.delayedCall(2000, () => {
+                        if (typeof window !== 'undefined' && window.location && typeof window.location.reload === 'function') {
+                            window.location.reload();
+                        }
+                    });
                 } else {
                     // Redonne la main au joueur
                     this.time.delayedCall(1000, () => this.events.emit('EnableMenu'));
                 }
             }
-        })
+        });
     }
 
     endBattle() {
@@ -203,9 +260,13 @@ class BattleScene extends Phaser.Scene {
         }
 
         // Sauvegarder les HPs restants
-        window.gameState.player.hp = this.playerHp;
-        window.gameState.player.mp = this.playerMp;
-        window.gameState.save();
+        if (window.gameState && window.gameState.player) {
+            window.gameState.player.hp = this.playerHp;
+            window.gameState.player.mp = this.playerMp;
+            if (typeof window.gameState.save === 'function') {
+                window.gameState.save();
+            }
+        }
 
         // Redonner le contrôle de la scène principale
         this.scene.stop('UIScene');

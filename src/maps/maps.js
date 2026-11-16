@@ -34,6 +34,14 @@ const MapsData = {
         chestsData: {
             "o": { id: "chest1", item: { id: "potion", name: "Potion de Soin", qty: 3 }, opened: false }
         },
+        bossData: {
+            id: "boss_guardian",
+            name: "Gardien des Lieux",
+            x: 34,
+            y: 23,
+            type: "major",
+            texture: "monster_boss"
+        },
         doorsData: {
             houseDoorTarget: "House1",
             houseSpawn: {x: 4, y: 5}
