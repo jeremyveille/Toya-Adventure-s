@@ -4,89 +4,97 @@ class UIScene extends Phaser.Scene {
     }
 
     create() {
-        // Dessin du cadre bas
+        const style = { fontFamily: '"Press Start 2P", monospace', fontSize: '11px', color: '#f4ecd2' };
         this.graphics = this.add.graphics();
-        this.graphics.lineStyle(4, 0xffffff);
-        this.graphics.fillStyle(0x111133, 0.9); // Bleu foncé
-        this.graphics.fillRect(10, 450, 780, 140);
-        this.graphics.strokeRect(10, 450, 780, 140);
+        this.graphics.fillStyle(0x14281f, 0.97);
+        this.graphics.fillRect(16, 424, 768, 160);
+        this.graphics.lineStyle(2, 0xd8c18a);
+        this.graphics.strokeRect(17, 425, 766, 158);
+        this.graphics.lineStyle(1, 0x53604a);
+        this.graphics.strokeRect(21, 429, 758, 150);
+        this.messageText = this.add.text(34, 446, 'Le Gardien des Lieux attaque !', {
+            ...style, wordWrap: { width: 358 }, lineSpacing: 10
+        });
 
-        // Zone de message
-        this.messageText = this.add.text(30, 470, "", { color: '#ffffff', fontSize: '20px', fontFamily: 'Courier' });
-
-        // Menu d'actions
         this.menus = [];
-        this.createMenuItem(450, 470, "> Attaquer", 'attack');
-        this.createMenuItem(450, 510, "> Magie (PM: 15)", 'magic');
-        this.createMenuItem(650, 470, "> Soin (PM: 10)", 'heal');
-        this.createMenuItem(650, 510, "> Fuir", 'flee');
-
-        // Créer les graphiques pour les Barres de vie
+        this.createMenuItem(416, 450, '[1] Attaquer', 'attack');
+        this.createMenuItem(416, 493, '[2] Magie 15 PM', 'magic');
+        this.createMenuItem(626, 450, '[3] Soin 10 PM', 'heal');
+        this.createMenuItem(626, 493, '[4] Fuir', 'flee');
+        this.add.text(416, 555, 'Choisis une action.', { ...style, fontSize: '9px', color: '#ddc586' });
         this.hpGraphics = this.add.graphics();
-        this.barTexts = []; // Pour stocker et mettre à jour les textes des barres
+        this.barTexts = [];
         this.battleScene = this.scene.get('BattleScene');
         this.battleScene.events.on('Message', this.updateMessage, this);
         this.battleScene.events.on('EnableMenu', this.enableMenu, this);
         this.battleScene.events.on('UpdateStats', this.drawBars, this);
+        this.events.once('shutdown', () => {
+            this.battleScene.events.off('Message', this.updateMessage, this);
+            this.battleScene.events.off('EnableMenu', this.enableMenu, this);
+            this.battleScene.events.off('UpdateStats', this.drawBars, this);
+        });
+        this.actionKeys = this.input.keyboard.addKeys('ONE,TWO,THREE,FOUR');
+        this.drawBars({
+            php: this.battleScene.playerHp, pmax: this.battleScene.playerMaxHp,
+            pmp: this.battleScene.playerMp,
+            ehp: this.battleScene.enemyHp, emax: this.battleScene.enemyMaxHp
+        });
     }
 
     createMenuItem(x, y, text, id) {
-        let txt = this.add.text(x, y, text, { color: '#ffffff', fontSize: '20px', fontFamily: 'Courier' })
-            .setInteractive({ useHandCursor: true })
+        const item = this.add.text(x, y, text, {
+            fontFamily: '"Press Start 2P", monospace', fontSize: '10px',
+            color: '#f4ecd2', padding: { x: 3, y: 8 }
+        }).setInteractive({ useHandCursor: true })
             .on('pointerdown', () => this.selectAction(id))
-            .on('pointerover', () => txt.setColor('#ffff00'))
-            .on('pointerout', () => txt.setColor('#ffffff'));
-        
-        this.menus.push(txt);
-        return txt;
+            .on('pointerover', () => item.setColor('#f1d78a'))
+            .on('pointerout', () => item.setColor('#f4ecd2'));
+        this.menus.push(item);
+        return item;
+    }
+
+    update() {
+        const actions = ['attack', 'magic', 'heal', 'flee'];
+        ['ONE', 'TWO', 'THREE', 'FOUR'].forEach((key, index) => {
+            if (Phaser.Input.Keyboard.JustDown(this.actionKeys[key])) this.selectAction(actions[index]);
+        });
     }
 
     drawBars(stats) {
         this.hpGraphics.clear();
-        this.barTexts.forEach(t => t.destroy());
+        this.barTexts.forEach(text => text.destroy());
         this.barTexts = [];
-
-        // Fonction locale
-        const drawBar = (x, y, val, max, color, labelText) => {
-            let width = 200;
-            // Background
-            this.hpGraphics.fillStyle(0x000000);
-            this.hpGraphics.fillRect(x, y, width, 15);
-            // Filled
-            let percent = Phaser.Math.Clamp(val / max, 0, 1);
+        const drawBar = (x, y, value, max, color, label) => {
+            this.hpGraphics.fillStyle(0x14281f, 0.96);
+            this.hpGraphics.fillRect(x - 8, y - 20, 218, 38);
+            this.hpGraphics.fillStyle(0x0c1914);
+            this.hpGraphics.fillRect(x, y, 200, 8);
             this.hpGraphics.fillStyle(color);
-            this.hpGraphics.fillRect(x, y, width * percent, 15);
-            // Border
-            this.hpGraphics.lineStyle(2, 0xffffff);
-            this.hpGraphics.strokeRect(x, y, width, 15);
-            
-            // Label
-            let txt = this.add.text(x + width + 10, y - 2, `${labelText} ${val}/${max}`, { fontSize: '14px', fontFamily: 'Courier', color: '#ffffff' });
-            this.barTexts.push(txt);
-        }
-
-        // Joueur : HP
-        drawBar(30, 520, stats.php, stats.pmax, 0x00ff00, "HP");
-        // Joueur : MP
-        drawBar(30, 550, stats.pmp, 50, 0x0000ff, "MP"); // Max MP assumé
-        
-        // Boss HP (en haut !)
-        drawBar(300, 20, stats.ehp, stats.emax, 0xff0000, "BOSS HP");
+            this.hpGraphics.fillRect(x + 1, y + 1, Math.floor(198 * Phaser.Math.Clamp(value / max, 0, 1)), 6);
+            this.hpGraphics.lineStyle(1, 0xd8c18a);
+            this.hpGraphics.strokeRect(x, y, 200, 8);
+            this.barTexts.push(this.add.text(x, y - 15, `${label} ${Math.max(0, value)} / ${max}`, {
+                fontSize: '9px', fontFamily: '"Press Start 2P", monospace', color: '#f4ecd2'
+            }));
+        };
+        drawBar(34, 519, stats.php, stats.pmax, 0x83b85b, 'VIE');
+        drawBar(34, 556, stats.pmp, window.gameState.player.maxMp, 0x78b4c4, 'MAGIE');
+        drawBar(300, 45, stats.ehp, stats.emax, 0xd8795b, 'GARDIEN');
     }
 
     updateMessage(text) {
         this.messageText.setText(text);
-        // Cacher temporairement les options pendant une animation
-        this.menus.forEach(m => m.setVisible(false));
+        this.menus.forEach(menu => menu.setVisible(false));
     }
 
     enableMenu() {
-        this.menus.forEach(m => m.setVisible(true));
-        this.messageText.setText("À l'attaque !");
+        this.menus.forEach(menu => menu.setVisible(true));
+        this.messageText.setText('À toi de jouer.');
     }
 
     selectAction(action) {
-        this.menus.forEach(m => m.setVisible(false));
+        if (!this.menus.length || !this.menus[0].visible) return;
+        this.menus.forEach(menu => menu.setVisible(false));
         this.battleScene.receivePlayerSelection(action);
     }
 }
