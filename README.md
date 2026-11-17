@@ -1,6 +1,15 @@
-# RPG - L'Éveil
+# Toya Adventure's — Le sentier des sources
 
-Un prototype de jeu RPG 2D en vue de dessus, développé pour le navigateur web. Il s'inspire du style d'Akira Toriyama. Le jeu permet de se déplacer sur une carte, d'interagir et potentiellement de combattre.
+Un action-RPG 2.5D en pixel-art pour navigateur, conservant Phaser 3.55.2 et
+l'architecture JavaScript d'origine. Le premier niveau est une boucle jouable :
+rencontrer le Guide, couper le buisson du passage, traverser le pont, esquiver
+une charge annoncée, vaincre la créature, ouvrir le coffre et revenir au Guide.
+L'inventaire, le craft, les quêtes et les transitions de maison restent disponibles.
+
+Les principes de lisibilité des RPG portables inspirent le rythme, sans copier
+les ressources Nintendo. Voir [GAME_FEEL_REFERENCE.md](GAME_FEEL_REFERENCE.md)
+pour les sources et leurs limites, et [IMPLEMENTATION_AUDIT.md](IMPLEMENTATION_AUDIT.md)
+pour le diagnostic initial.
 
 ## Lancement Rapide
 
@@ -10,7 +19,8 @@ Un prototype de jeu RPG 2D en vue de dessus, développé pour le navigateur web.
 
 ## Tests
 
-Une suite de tests unitaires (vanilla JS exécuté via Node) a été mise en place pour vérifier la logique métier (`GameManager`).
+La suite Node sans dépendance de test couvre la logique métier et les contrats
+de mouvement, combat et progression : **79 vérifications**.
 - **Lancer les tests** : `npm test`
 
 Ces tests valident :
@@ -20,6 +30,31 @@ Ces tests valident :
 - Le système de craft.
 - L'utilisation des objets.
 - La validation des quêtes.
+- L'accélération à 30/60/120 Hz, la course et les diagonales.
+- Les trois phases de l'épée, ses quatre directions et un impact par cible.
+- La télégraphie, les charges, l'invulnérabilité et les projectiles.
+- Le parcours A–G, les récompenses uniques, la migration v1 et la reprise après défaite.
+
+Les tests Node utilisent un moteur simulé ; les vérifications navigateur et
+leurs limites sont détaillées dans [VALIDATION.md](VALIDATION.md).
+
+Si Playwright et Chromium sont déjà disponibles, démarrez le serveur puis
+exécutez `node tests/browser/playthrough.cjs` et
+`node tests/browser/world_checks.cjs`. Ces outils de validation sont facultatifs ;
+aucune dépendance n'est ajoutée au jeu. `CHROMIUM_PATH` permet de choisir le
+navigateur et `TOYA_BASE_URL` le serveur. Les captures sont créées dans `work/`.
+
+## Réglages du gameplay
+
+`src/data/gameFeel.js` centralise vitesses, accélération, freinage, portée,
+phases de l'épée, invulnérabilité, comportements ennemis et caméra. Ce sont des
+réglages propres à Toya, pas des mesures de Phantom Hourglass.
+
+Les objets utilisent des pieds physiques et un tri selon Y. Les textures
+originales de `src/data/PixelArt.js` partagent une palette et une lumière en haut
+à gauche ; les arbres et toits s'effacent lorsque Toya passe derrière. L'eau
+est animée, les garde-corps sont segmentés en profondeur et une terrasse basse
+est accessible par des marches, sans saut ni moteur 3D.
 
 ## Conformité et Qualité
 
@@ -55,8 +90,19 @@ Ces tests valident :
 - **Attaque (Temps réel)** : `Espace`.
 - **Interaction (Parler, etc.)** : Touche `E`.
 - **Interface** : `I` (Inventaire), `J` (Quêtes), `C` (Crafting).
+- **Dialogue** : `E` ou `Espace` pour afficher la suite, puis fermer.
+- **Inventaire** : `1` pour une potion, `2` pour utiliser une pierre à aiguiser.
+- **Menus** : même touche ou `Échap` pour fermer ; `Page préc./suiv.` si nécessaire.
 
 ## Architecture de la Carte
 
-Les cartes sont gérées dans `src/maps/maps.js`. Il s'agit de tableaux simples (0=herbe, 1=arbre, 2=eau, 3=maison, 4=chemin).
+Les cartes sont gérées dans `src/maps/maps.js` sous forme de chaînes :
+`.` herbe, `T/t` arbres, `W` eau, `B` pont, `C` falaise, `H` maison,
+`d` chemin, `S` départ, `N` guide, `E` ennemi, `b` buisson, `o` coffre.
+La propriété `tutorial` identifie les objectifs par coordonnées stables ;
+`terraces` décrit des décors surélevés accessibles par un escalier.
 Ajoutez des zones et des PNJ directement dans les données pour étendre le jeu !
+
+La sauvegarde conserve inventaire, quêtes, statistiques et objets du monde
+consommés, sous la clé historique `rpg_save_v1` (format version 2). Une partie
+v1 reste lisible. Sans consentement, la session fonctionne en mémoire.
