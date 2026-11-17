@@ -195,6 +195,7 @@ function createMockScene() {
 // Load Modules
 const rootDir = path.resolve(__dirname, '..');
 const GameConfig = require(path.join(rootDir, 'src/data/config.js'));
+require(path.join(rootDir, 'src/data/gameFeel.js'));
 const GameManager = require(path.join(rootDir, 'src/managers/GameManager.js'));
 
 const mapsSource = fs.readFileSync(path.join(rootDir, 'src/maps/maps.js'), 'utf8');
@@ -415,7 +416,7 @@ test("T1-FEAT", "Village spawn symbol 'S' is uniquely defined", () => {
         }
     });
     assert.strictEqual(spawnCount, 1, "Exactly one spawn point 'S' must exist in Village");
-    assert.deepStrictEqual(spawnCoords, { x: 5, y: 3 }, "Village spawn must be located at col 5, row 3");
+    assert.deepStrictEqual(spawnCoords, { x: 9, y: 8 }, "Village spawn must be near the Guide at col 9, row 8");
 });
 
 test("T1-FEAT", "NPC and Chest definitions in maps data", () => {
@@ -672,7 +673,9 @@ test("T3-CROSS", "Player dialogue guard (active=false) freezes movement velocity
     // When active, moves
     player.active = true;
     player.update();
-    assert.strictEqual(player.body.velocity.x, -player.speed, "Active player must move on keypress");
+    assert.ok(player.body.velocity.x < 0 && player.body.velocity.x >= -player.speed, "Active player accelerates on keypress without exceeding walk speed");
+    for (let frame = 0; frame < 10; frame++) player.update(frame * 1000 / 60, 1000 / 60);
+    assert.strictEqual(player.body.velocity.x, -player.speed, "Held input reaches configured walk speed");
 
     // When inactive (dialogue or cutscene), velocity must be strictly 0
     player.active = false;
