@@ -1,35 +1,47 @@
 const MapsData = {
     "Village": {
         tileSize: 64,
+        terraces: [{ x: 31, y: 20, width: 3, height: 2, stairsColumn: 1 }],
         layoutText: [
             "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
             "TCCCT.......t...T......CCTTTT......HHH.T",
             "TCC.....t.......T..t...CCTTTT..>...HHH.T",
-            "TCC..S......T...T......CCTTTT......HHH.T",
+            "TCC.........T...T......CCTTTT......HHH.T",
             "TCC.....t.......TTT...t.......T....d...T",
             "TCC.......T.....TT............T....d...T",
             "TTT..........T..TT..t...t..........d...T",
             "TT....T...N.....TT...TTT...........d...T",
-            "TT......>...d.....TT...T......x..ddddd.T",
-            "TTT......ddd.........T........x..d...x.T",
-            "TTTT...ddddddd..T....T...........d.....T",
-            "TTTT...d.....d.......T...t.......d.....T",
-            "T...b..d..t..d.......T.........b.d.....T",
-            "T..R...d.....d.......T...........d.....T",
-            "T...r..d.....d..b....T...........d.....T",
+            "TT......>S..d.....TT...T......x..ddddd.T",
+            "TTT......ddddddddddddddddddd..x..d...x.T",
+            "TTTT...ddddddd..T....T.....d.....d.....T",
+            "TTTT...d.....d.......T...t.d.....d.....T",
+            "T...b..d..t..d..b....T.....d.....d.....T",
+            "TCCCCCCCCCCCCCCCCCCCCCCCCCCbCCCCCCCCCCCT",
+            "T...r..d.....d.......T....dddd...d.....T",
             "WWWWWWWWWWWWWWWWWWWWWWWWWWBBBBWWWWWWWWWW",
             "WWWWWWWWWWWWWWWWWWWWWWWWWWBBBBWWWWWWWWWW",
-            "T....................T.......dddddd....T",
-            "T.....b....E...t.....T...t...d....x....T",
-            "T............................d...RRR...T",
-            "T.......T............T.......d...RRR...T",
-            "T...o.........t......T.......d...RRR...T",
+            "T....................T....ddddddddd....T",
+            "T.....b........t.....T...tdEdd....x....T",
+            "T..........................ddd...RRR...T",
+            "T.......T............T.....dod...RRR...T",
+            "T.............t......T.......d...RRR...T",
             "T.................b..........d....r....T",
             "T..t......t..................d.........T",
             "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
         ],
+        // Stable map coordinates are also the persistence IDs used by WorldScene.
+        tutorial: {
+            gateId: 'Village:27:13',
+            enemyId: 'Village:27:18',
+            chestId: 'chest1',
+            guide: { x: 10, y: 7 },
+            gate: { x: 27, y: 13 },
+            bridge: { x: 27, y: 17 },
+            enemy: { x: 27, y: 18 },
+            chest: { x: 28, y: 20 }
+        },
         npcsData: {
-            "N": { id: "npc1", name: "Guide", dialogue: "Bienvenue.\nUn monde dangereux t'attend.\nDétruis le buisson au sud [Espace].\nTraverse le pont et reste sur tes gardes !", questItem: null, questQty: null }
+            "N": { id: "npc1", name: "Guide", dialogue: "Suis le chemin vers le sud-est.\nCoupe le buisson avec Espace, puis traverse le pont.", questItem: null, questQty: null }
         },
         chestsData: {
             "o": { id: "chest1", item: { id: "potion", name: "Potion de Soin", qty: 3 }, opened: false }
@@ -59,3 +71,5 @@ const MapsData = {
         }
     }
 };
+
+if (typeof module !== 'undefined' && module.exports) module.exports = MapsData;
