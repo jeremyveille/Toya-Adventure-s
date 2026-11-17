@@ -46,6 +46,7 @@ class GameManager {
         this.inventory = [];
         /** @type {Quest[]} */
         this.quests = JSON.parse(JSON.stringify(this.config.initialQuests || []));
+        this.world = this.createWorldState();
     }
 
     /**
@@ -58,9 +59,11 @@ class GameManager {
         }
         
         const data = {
+            version: 2,
             player: this.player,
             inventory: this.inventory,
-            quests: this.quests
+            quests: this.quests,
+            world: this.world
         };
         try {
             if (typeof localStorage !== 'undefined') {
@@ -86,9 +89,27 @@ class GameManager {
                 // Validation très basique pour des raisons de sécurité / RGPD (minimisation des données)
                 // On s'assure que les types attendus sont présents.
                 if (data && typeof data === 'object') {
-                    if (data.player && typeof data.player.hp === 'number') this.player = data.player;
-                    if (Array.isArray(data.inventory)) this.inventory = data.inventory;
-                    if (Array.isArray(data.quests)) this.quests = data.quests;
+                    if (data.player && typeof data.player === 'object' && Number.isFinite(data.player.hp)) {
+                        // Older saves may predate a newly introduced player statistic.
+                        const defaults = this.config.initialPlayerState || {};
+                        Object.keys(defaults).forEach(key => {
+                            if (Number.isFinite(data.player[key])) this.player[key] = data.player[key];
+                        });
+                        this.player.maxHp = Math.max(1, this.player.maxHp);
+                        this.player.hp = Math.max(0, Math.min(this.player.maxHp, this.player.hp));
+                    }
+                    if (Array.isArray(data.inventory)) {
+                        this.inventory = data.inventory.filter(item => item && typeof item.id === 'string' &&
+                            typeof item.name === 'string' && Number.isInteger(item.qty) && item.qty > 0).map(item => ({...item}));
+                    }
+                    if (Array.isArray(data.quests)) {
+                        this.quests = data.quests.filter(quest => quest && typeof quest.id === 'string' &&
+                            typeof quest.title === 'string' && typeof quest.desc === 'string').map(quest => ({...quest}));
+                    }
+                    // No world ledger in v1: keep the default, preserving inventory and quests.
+                    this.world = this.createWorldState(data.world);
+                    // A saved defeat must not create an endless reload/game-over loop.
+                    if (this.player.hp <= 0) this.player.hp = this.player.maxHp;
                     console.log("Partie chargée !");
                     return true;
                 }
@@ -99,12 +120,57 @@ class GameManager {
         return false;
     }
 
+    createWorldState(saved) {
+        const state = {
+            clearedResources: [], openedChests: [], defeatedEnemies: [],
+            tutorial: {
+                moved: false, talked: false, bushCleared: false, crossedBridge: false,
+                ran: false, enemyDefeated: false, chestOpened: false, completed: false
+            }
+        };
+        if (!saved || typeof saved !== 'object') return state;
+        ['clearedResources', 'openedChests', 'defeatedEnemies'].forEach(kind => {
+            if (Array.isArray(saved[kind])) {
+                state[kind] = [...new Set(saved[kind].filter(id => typeof id === 'string'))];
+            }
+        });
+        if (saved.tutorial && typeof saved.tutorial === 'object') {
+            Object.keys(state.tutorial).forEach(flag => {
+                state.tutorial[flag] = saved.tutorial[flag] === true;
+            });
+        }
+        return state;
+    }
+
+    isWorldObjectDone(kind, id) {
+        return Array.isArray(this.world[kind]) && this.world[kind].includes(id);
+    }
+
+    markWorldObject(kind, id) {
+        if (!Array.isArray(this.world[kind]) || typeof id !== 'string' || this.isWorldObjectDone(kind, id)) return false;
+        this.world[kind].push(id);
+        this.save();
+        return true;
+    }
+
+    setTutorialFlag(flag) {
+        if (!Object.prototype.hasOwnProperty.call(this.world.tutorial, flag) || this.world.tutorial[flag]) return false;
+        this.world.tutorial[flag] = true;
+        this.save();
+        return true;
+    }
+
+    restoreAtCheckpoint() {
+        this.player.hp = this.player.maxHp;
+        this.save();
+    }
+
     /**
      * Adds an item to the inventory
      * @param {InventoryItem} item 
      */
     addItem(item) {
-        if (!item || typeof item.id !== 'string') return;
+        if (!item || typeof item.id !== 'string' || !Number.isInteger(item.qty) || item.qty <= 0) return;
         
         let existing = this.inventory.find(i => i.id === item.id);
         if(existing) {
@@ -122,6 +188,7 @@ class GameManager {
      * @returns {boolean} True if successfully removed
      */
     removeItem(itemId, qty = 1) {
+        if (!Number.isInteger(qty) || qty <= 0) return false;
         let existing = this.inventory.find(i => i.id === itemId);
         if(existing && existing.qty >= qty) {
             existing.qty -= qty;
@@ -202,13 +269,17 @@ class GameManager {
      * @returns {boolean} True if used successfully
      */
     useItem(itemId) {
-        if (this.removeItem(itemId, 1)) {
-            if (itemId === 'potion') {
-                this.player.hp = Math.min(this.player.maxHp, this.player.hp + 30);
-                return true;
-            }
+        if (itemId !== 'potion' && itemId !== 'sword_upgrade') return false;
+        if (itemId === 'potion' && this.player.hp >= this.player.maxHp) return false;
+        if (!this.removeItem(itemId, 1)) return false;
+        if (itemId === 'potion') {
+            this.player.hp = Math.min(this.player.maxHp, this.player.hp + 30);
+        } else {
+            this.player.damage += 5;
         }
-        return false;
+        // Save the effect as well as consuming the item.
+        this.save();
+        return true;
     }
 }
 
