@@ -12,7 +12,7 @@ class OcclusionManager {
                 minX: sprite.x - sprite.displayWidth * sprite.originX,
                 maxX: sprite.x + sprite.displayWidth * (1 - sprite.originX),
                 minY: sprite.y - sprite.displayHeight * sprite.originY,
-                maxY: sprite.y + sprite.displayHeight * (1 - sprite.originX)
+                maxY: sprite.y + sprite.displayHeight * (1 - sprite.originY)
             },
             targetAlpha,
             baseY: bY,
@@ -60,6 +60,9 @@ class WorldScene extends Phaser.Scene {
         this.targetMapName = data.map || "Village";
         this.spawnOverride = data.spawn || null;
         this.isDead = false;
+        this.isTransitioning = false;
+        this.controlsLocked = false;
+        this.interactionHint = '';
     }
 
     preload() {
@@ -79,7 +82,7 @@ class WorldScene extends Phaser.Scene {
 
         this.walls = this.physics.add.staticGroup();
         this.interactiveZones = this.physics.add.staticGroup();
-        this.enemies = this.physics.add.group();
+        this.enemies = this.physics.add.group({ collideWorldBounds: true, immovable: false });
         this.bossGroup = this.physics.add.group();
         this.resourceGroup = this.physics.add.staticGroup();
         this.doorGroup = this.physics.add.staticGroup();
@@ -94,8 +97,6 @@ class WorldScene extends Phaser.Scene {
         terrainGraphics.setDepth(0);
         let dirtGraphics = this.add.graphics();
         dirtGraphics.setDepth(1);
-        let waterOverlapGraphics = this.add.graphics();
-        waterOverlapGraphics.setDepth(2);
         
         let spawnX = ts * 5 + ts/2, spawnY = ts * 3 + ts/2;
         let houseCells = [];
@@ -112,17 +113,17 @@ class WorldScene extends Phaser.Scene {
                 // --- Base Herbe et Sol ---
                 if (cell !== 'w' && cell !== 'f' && cell !== 'W' && cell !== 'B') {
                     // Base Herbe riche et chaleureuse (Akira Toriyama fantasy style)
-                    terrainGraphics.fillStyle(0x5c9e2b);
+                    terrainGraphics.fillStyle(0x729750);
                     terrainGraphics.fillRect(px, py, ts, ts);
                     
                     // Touffes d'herbe et fleurs procédurales
                     let rand = (x * 13 + y * 7) % 100;
                     if (rand < 55) {
-                        terrainGraphics.fillStyle(0x46821a); // Touffes vert foncé
+                        terrainGraphics.fillStyle(0x5c8246); // Touffes vert foncé
                         terrainGraphics.fillRect(px + 8, py + 16, 8, 4);
                         terrainGraphics.fillRect(px + 12, py + 12, 4, 4);
                         terrainGraphics.fillRect(px + 40, py + 44, 12, 4);
-                        terrainGraphics.fillStyle(0x6eb532); // Reflet soleil
+                        terrainGraphics.fillStyle(0x88a95d); // Reflet soleil
                         terrainGraphics.fillRect(px + 8, py + 14, 4, 2);
                     }
                     if (rand < 18) { // Fleurs multicolores (marguerites, boutons d'or, coquelicots)
@@ -148,12 +149,7 @@ class WorldScene extends Phaser.Scene {
                     terrainGraphics.fillStyle(0x256588); // Corps de l'eau
                     terrainGraphics.fillRect(px, py + 8, ts, ts - 8);
                     
-                    // Vagues et reflets
-                    terrainGraphics.fillStyle(0xa8e6cf);
-                    terrainGraphics.fillRect(px + 12, py + 18, 20, 3);
-                    terrainGraphics.fillRect(px + 36, py + 42, 16, 3);
-                    terrainGraphics.fillStyle(0xffffff); // Reflet miroitant
-                    terrainGraphics.fillRect(px + 24, py + 20, 6, 2);
+                    this.add.sprite(cx, cy, 'tex_water_0').play('water-flow').setDepth(1);
                     
                     // Mur bloquant l'eau
                     this.createWall(cx, cy, ts);
@@ -184,21 +180,11 @@ class WorldScene extends Phaser.Scene {
                     let isEastEdge = x < width - 1 && layout[y][x + 1] === 'W';
 
                     if (isWestEdge) {
-                        let gRailingW = this.add.graphics();
-                        gRailingW.fillStyle(0x4a2e1b);
-                        gRailingW.fillRect(px + 2, py + 4, 6, ts - 8);
-                        gRailingW.fillStyle(0x8a6235);
-                        gRailingW.fillRect(px + 1, py + 2, 8, 4);
-                        gRailingW.setDepth(Math.floor(cy + ts * 0.5));
+                        this.createBridgeRailing(px + 4, py, ts);
                         this.createWall(px + 4, cy, 8, ts);
                     }
                     if (isEastEdge) {
-                        let gRailingE = this.add.graphics();
-                        gRailingE.fillStyle(0x4a2e1b);
-                        gRailingE.fillRect(px + ts - 8, py + 4, 6, ts - 8);
-                        gRailingE.fillStyle(0x8a6235);
-                        gRailingE.fillRect(px + ts - 9, py + 2, 8, 4);
-                        gRailingE.setDepth(Math.floor(cy + ts * 0.5));
+                        this.createBridgeRailing(px + ts - 4, py, ts);
                         this.createWall(px + ts - 4, cy, 8, ts);
                     }
                 }
@@ -236,14 +222,14 @@ class WorldScene extends Phaser.Scene {
 
                 // --- Chemin de terre et auto-tiling organique ---
                 if (cell === 'd') {
-                    dirtGraphics.fillStyle(0xc49a62); // Terre battue
+                    dirtGraphics.fillStyle(0xbfa570); // Terre battue
                     dirtGraphics.fillRect(px, py, ts, ts);
                     
                     // Gravillons et ornières
-                    dirtGraphics.fillStyle(0xa37b4a);
+                    dirtGraphics.fillStyle(0xa68d5f);
                     dirtGraphics.fillRect(px + 16, py + 16, 4, 4);
                     dirtGraphics.fillRect(px + 44, py + 32, 6, 4);
-                    dirtGraphics.fillStyle(0xdeb887);
+                    dirtGraphics.fillStyle(0xd3bc89);
                     dirtGraphics.fillRect(px + 28, py + 48, 8, 4);
 
                     // Bords herbeux organiques
@@ -252,7 +238,7 @@ class WorldScene extends Phaser.Scene {
                     let left = x > 0 ? layout[y][x-1] : null;
                     let right = x < width-1 ? layout[y][x+1] : null;
 
-                    dirtGraphics.fillStyle(0x5c9e2b);
+                    dirtGraphics.fillStyle(0x729750);
                     if (top !== 'd') {
                         dirtGraphics.fillRect(px, py, ts, 8);
                         dirtGraphics.fillRect(px + 12, py + 8, 16, 8);
@@ -275,6 +261,7 @@ class WorldScene extends Phaser.Scene {
                 // --- OBJETS 2.5D (Depth Y-sorting unifié) ---
                 if (cell === 'T') {
                     this.createTree(cx, cy, ts, false);
+                    if (x === 0 || y === 0 || x === width - 1 || y === height - 1) this.createWall(cx, cy, ts);
                 } else if (cell === 't') {
                     this.createTree(cx, cy, ts, true);
                 } else if (cell === 'C') {
@@ -291,10 +278,10 @@ class WorldScene extends Phaser.Scene {
                 } else if (cell === 'N') {
                     this.createNPC(cx, cy, ts, this.currentMapData.npcsData['N']);
                 } else if (cell === 'E') {
-                    this.createEnemy(cx, cy, 'minor');
+                    this.createEnemy(cx, cy, 'minor', `${this.targetMapName}:${x}:${y}`);
                 } else if (cell === 'b') {
                     // Correctif Bug M4 : 'b' minuscule pour buisson récoltable
-                    this.createResource(cx, cy, ts, 'bush');
+                    this.createResource(cx, cy, ts, 'bush', `${this.targetMapName}:${x}:${y}`);
                 } else if (cell === 'o') {
                     this.createChest(cx, cy, ts, this.currentMapData.chestsData['o']);
                 } else if (cell === '>') {
@@ -306,8 +293,15 @@ class WorldScene extends Phaser.Scene {
             }
         }
 
+        // Rasterize thousands of static terrain rectangles once, rather than
+        // replaying their Graphics commands on every frame. Animated water and
+        // Y-sorted objects remain independent.
+        this.bakeGround(terrainGraphics, 'terrain', width * ts, height * ts, 0);
+        this.bakeGround(dirtGraphics, 'paths', width * ts, height * ts, 1);
+
         // Bâtiments 2.5D en volume avec toits praticables et occlusion
         this.buildHouses(houseCells, ts);
+        this.buildTerraces(ts);
 
         // --- JOUEUR (Ancrage 2.5D aux pieds) ---
         if (this.spawnOverride) {
@@ -324,7 +318,7 @@ class WorldScene extends Phaser.Scene {
 
         // --- AMBIANCE & POST-PROCESSING 2.5D ---
         let overlayColor = this.targetMapName === "House1" ? 0x000000 : 0xdc9233;
-        let overlayAlpha = this.targetMapName === "House1" ? 0.3 : 0.15;
+        let overlayAlpha = this.targetMapName === "House1" ? 0.08 : 0.025;
         let overlay = this.add.rectangle(0, 0, width * ts, height * ts, overlayColor, overlayAlpha).setOrigin(0,0);
         overlay.setBlendMode(this.targetMapName === "House1" ? Phaser.BlendModes.NORMAL : Phaser.BlendModes.ADD);
         overlay.setDepth(9000);
@@ -345,10 +339,10 @@ class WorldScene extends Phaser.Scene {
         }
 
         // --- CAMERA 2.5D ---
-        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        this.cameras.main.startFollow(this.player, true, GameFeelConfig.camera.followLerp, GameFeelConfig.camera.followLerp);
         this.cameras.main.setBounds(0, 0, width * ts, height * ts);
         this.cameras.main.setDeadzone(40, 30);
-        this.cameras.main.setZoom(this.targetMapName === "House1" ? 1.8 : 1.5);
+        this.cameras.main.setZoom(this.targetMapName === "House1" ? 1.5 : GameFeelConfig.camera.zoom);
         this.cameras.main.roundPixels = true;
 
         // --- COLLISIONS & PHYSIQUE ---
@@ -357,13 +351,25 @@ class WorldScene extends Phaser.Scene {
         this.physics.add.overlap(this.player.weaponHitbox, this.enemies, this.hitMinorEnemy, null, this);
         this.physics.add.overlap(this.player.weaponHitbox, this.resourceGroup, this.hitResource, null, this);
         this.physics.add.overlap(this.player, this.doorGroup, this.enterDoor, null, this);
-
-        this.input.keyboard.on('keydown-E', () => {
-            this.physics.overlap(this.player.interactionHitbox, this.interactiveZones, this.handleInteraction, null, this);
+        this.physics.add.overlap(this.player, this.enemies, (player, enemy) => {
+            if (!this.controlsLocked && enemy.canDamagePlayer()) player.receiveDamage(GameFeelConfig.enemy.contactDamage, enemy);
         });
 
+        this.input.keyboard.on('keydown-E', () => {
+            if (this.controlsLocked || this.isTransitioning || this.player.isAttacking) return;
+            this.updateInteractionTarget();
+            if (this.interactionTarget) this.handleInteraction(this.player.interactionHitbox, this.interactionTarget);
+        });
+
+        this.cameras.main.fadeIn(250, 0, 0, 0);
+        if (this.targetMapName === 'Village') this.tutorial = new TutorialManager(this);
+        else this.tutorial = null;
+        this.events.on('EnemyDefeated', this.onEnemyDefeated, this);
+        this.events.once('shutdown', () => {
+            this.events.off('EnemyDefeated', this.onEnemyDefeated, this);
+            this.input.keyboard.removeAllListeners('keydown-E');
+        });
         this.scene.launch('HUDScene');
-        if (this.targetMapName === "Village") this.setupTutorial();
     }
 
     createWall(cx, cy, width, height = width) {
@@ -373,9 +379,28 @@ class WorldScene extends Phaser.Scene {
         return wall;
     }
 
+    bakeGround(graphics, layer, width, height, depth) {
+        const key = `${this.targetMapName}-${layer}`;
+        if (!this.textures.exists(key)) graphics.generateTexture(key, width, height);
+        graphics.destroy();
+        this.add.image(0, 0, key).setOrigin(0, 0).setDepth(depth);
+    }
+
+    createBridgeRailing(x, y, ts) {
+        // Each short segment sorts against the feet, including the foreground posts.
+        for (let offset = 0; offset < ts; offset += 16) {
+            const rail = this.add.graphics().setDepth(y + offset + 16);
+            rail.fillStyle(0x493a29);
+            rail.fillRect(x - 3, y + offset - 8, 6, 24);
+            rail.fillStyle(0xaa8250);
+            rail.fillRect(x - 4, y + offset - 10, 6, 4);
+            rail.fillRect(x - 2, y + offset - 4, 2, 16);
+        }
+    }
+
     createProp(cx, cy, ts, tex) {
         let sprite = this.add.sprite(cx, cy + ts * 0.2, tex);
-        sprite.setOrigin(0.5, 0.85);
+        sprite.setOrigin(0.5, 0.95);
         let baseDepth = Math.floor(cy + ts * 0.2);
         sprite.setDepth(baseDepth);
         let shadow = this.add.sprite(cx, cy + ts * 0.2, 'tex_shadow');
@@ -447,7 +472,7 @@ class WorldScene extends Phaser.Scene {
 
     createCliff(cx, cy, ts, x, y, layout, width, height) {
         let hasBelow = y < height - 1 && layout[y + 1][x] === 'C';
-        let cliff = this.add.sprite(cx, cy, 'tex_cliff');
+        let cliff = this.add.sprite(cx, cy, hasBelow ? 'tex_cliff_top' : 'tex_cliff');
         let baseDepth = Math.floor(cy + ts * 0.5);
         cliff.setDepth(baseDepth);
 
@@ -467,7 +492,7 @@ class WorldScene extends Phaser.Scene {
             this.createWall(cx, cy + ts * 0.25, ts * 0.7, ts * 0.4);
         }
         let sprite = this.add.sprite(cx, cy + ts * 0.25, isSmall ? 'tex_ruin_small' : 'tex_ruin');
-        sprite.setOrigin(0.5, 0.85);
+        sprite.setOrigin(0.5, 0.95);
         let baseDepth = Math.floor(cy + ts * 0.25);
         sprite.setDepth(baseDepth);
         
@@ -490,6 +515,7 @@ class WorldScene extends Phaser.Scene {
         shadow.setDepth(baseDepth - 0.5);
 
         let sprite = this.add.sprite(cx, cy + ts * 0.25, 'tex_npc');
+        sprite.setScale(0.8);
         sprite.setOrigin(0.5, 0.9);
         sprite.setDepth(baseDepth);
         
@@ -506,11 +532,14 @@ class WorldScene extends Phaser.Scene {
         let zone = this.add.zone(cx, cy, ts * 1.5, ts * 1.5);
         this.physics.add.existing(zone, true);
         zone.npcData = data;
+        zone.questIndicator = indicator;
         this.interactiveZones.add(zone);
     }
 
-    createEnemy(cx, cy, type) {
-        let enemy = new Enemy(this, cx, cy, 'enemy', type);
+    createEnemy(cx, cy, type, id) {
+        if (window.gameState.isWorldObjectDone('defeatedEnemies', id)) return;
+        let enemy = new Enemy(this, cx, cy, 'tex_slime', type);
+        enemy.spawnId = id;
         let shadow = this.add.sprite(cx, cy, 'tex_shadow');
         shadow.setScale(1.6, 1.0);
         shadow.setDepth(Math.floor(cy) - 0.5);
@@ -518,18 +547,26 @@ class WorldScene extends Phaser.Scene {
         this.enemies.add(enemy);
     }
 
-    createResource(cx, cy, ts, type) {
-        let zone = this.createWall(cx, cy + ts * 0.2, 28, 20);
+    createResource(cx, cy, ts, type, id) {
+        if (window.gameState.isWorldObjectDone('clearedResources', id)) return;
+        const isGate = this.currentMapData.tutorial && this.currentMapData.tutorial.gateId === id;
+        let zone = this.createWall(cx, cy + ts * 0.2, isGate ? ts : 28, isGate ? 32 : 20);
         let sprite = this.add.sprite(cx, cy + ts * 0.2, 'tex_bush');
         sprite.setOrigin(0.5, 0.85);
         sprite.setDepth(Math.floor(cy + ts * 0.2));
         
         zone.resData = { type };
+        zone.resourceId = id;
         zone.sprite = sprite;
+        if (isGate) {
+            sprite.setScale(1.5, 1);
+            this.occlusionManager.register(sprite, null, 0.5, cy + ts * 0.2);
+        }
         this.resourceGroup.add(zone);
     }
 
     createChest(cx, cy, ts, data) {
+        data = { ...data, opened: window.gameState.isWorldObjectDone('openedChests', data.id) };
         this.createWall(cx, cy + ts * 0.15, 32, 20);
         let sprite = this.add.sprite(cx, cy + ts * 0.2, data.opened ? 'tex_chest_opened' : 'tex_chest_closed');
         sprite.setOrigin(0.5, 0.85);
@@ -545,6 +582,34 @@ class WorldScene extends Phaser.Scene {
         zone.chestData = data;
         zone.sprite = sprite; 
         this.interactiveZones.add(zone);
+    }
+
+    buildTerraces(ts) {
+        for (const terrace of this.currentMapData.terraces || []) {
+            const x = terrace.x * ts, y = terrace.y * ts;
+            const width = terrace.width * ts, height = terrace.height * ts;
+            const stepsX = x + terrace.stairsColumn * ts;
+            const g = this.add.graphics().setDepth(2);
+            // Raised terrace with a distinct top and front; access is by stairs.
+            g.fillStyle(0x8d9676); g.fillRect(x, y, width, height - 20);
+            g.fillStyle(0xb3b394); g.fillRect(x, y, width, 4);
+            g.fillStyle(0x596554); g.fillRect(x, y + height - 20, width, 28);
+            g.fillStyle(0x75816a); g.fillRect(x, y + height - 20, width, 4);
+            g.fillStyle(0x8a9774);
+            for (let row = 8; row < height - 24; row += 24) {
+                for (let col = 8; col < width - 8; col += 32) g.fillRect(x + col, y + row, 24, 2);
+            }
+            for (let step = 0; step < 5; step++) {
+                g.fillStyle(0x596554); g.fillRect(stepsX, y + height - 20 + step * 8, ts, 8);
+                g.fillStyle(0xb3b394); g.fillRect(stepsX + 2, y + height - 20 + step * 8, ts - 4, 3);
+            }
+            this.createWall(x + 4, y + height / 2, 8, height);
+            this.createWall(x + width - 4, y + height / 2, 8, height);
+            this.createWall(x + width / 2, y + 4, width, 8);
+            if (stepsX > x) this.createWall((x + stepsX) / 2, y + height - 8, stepsX - x, 16);
+            const rightStart = stepsX + ts;
+            if (rightStart < x + width) this.createWall((rightStart + x + width) / 2, y + height - 8, x + width - rightStart, 16);
+        }
     }
 
     buildHouses(houseCells, ts) {
@@ -606,331 +671,17 @@ class WorldScene extends Phaser.Scene {
     }
 
     generateTextures(ts) {
-        // --- 1. Ombre au sol (tex_shadow) ---
-        let gShadow = this.make.graphics({x:0, y:0, add:false});
-        gShadow.fillStyle(0x000000, 0.35);
-        gShadow.fillEllipse(16, 10, 30, 16);
-        gShadow.generateTexture('tex_shadow', 32, 20);
-
-        // --- 2. Grand Arbre 2.5D (tex_tree : 128x160 px) ---
-        let gTree = this.make.graphics({x:0, y:0, add:false});
-        let tw = 128, th = 160;
-        
-        // Tronc noueux en bois foncé
-        gTree.fillStyle(0x382214); // Ombre du tronc
-        gTree.fillRect(tw/2 - 14, 80, 28, 70);
-        gTree.fillStyle(0x4a2e1b); // Corps du tronc
-        gTree.fillRect(tw/2 - 10, 80, 20, 70);
-        // Racines évasées
-        gTree.fillRect(tw/2 - 20, 136, 10, 14);
-        gTree.fillRect(tw/2 + 10, 136, 10, 14);
-        gTree.fillStyle(0x2d7a2d); // Mousse au pied
-        gTree.fillRect(tw/2 - 12, 140, 6, 8);
-        gTree.fillRect(tw/2 + 6, 142, 6, 6);
-
-        // Canopée volumétrique 3 couches (Akira Toriyama pixel art)
-        // Couche 1: Vert très sombre (arrière et dessous)
-        gTree.fillStyle(0x1b431b);
-        gTree.fillCircle(tw/2, 50, 48);
-        gTree.fillCircle(tw/2 - 26, 60, 30);
-        gTree.fillCircle(tw/2 + 26, 60, 30);
-        
-        // Couche 2: Vert moyen riche
-        gTree.fillStyle(0x2d7a2d);
-        gTree.fillCircle(tw/2, 44, 40);
-        gTree.fillCircle(tw/2 - 22, 54, 24);
-        gTree.fillCircle(tw/2 + 22, 54, 24);
-        
-        // Couche 3: Vert clair ensoleillé (haut et face avant)
-        gTree.fillStyle(0x52b752);
-        gTree.fillCircle(tw/2, 34, 30);
-        gTree.fillCircle(tw/2 - 16, 44, 18);
-        gTree.fillCircle(tw/2 + 16, 44, 18);
-        
-        // Reflet jaune/vert vif sur la couronne
-        gTree.fillStyle(0x8ae645);
-        gTree.fillCircle(tw/2 - 8, 24, 14);
-        gTree.fillCircle(tw/2 + 10, 26, 10);
-        gTree.generateTexture('tex_tree', tw, th);
-
-        // --- 3. Petit Arbre 2.5D (tex_tree_small : 64x96 px) ---
-        let gSTree = this.make.graphics({x:0, y:0, add:false});
-        let stw = 64, sth = 96;
-        gSTree.fillStyle(0x382214);
-        gSTree.fillRect(stw/2 - 6, 52, 12, 38);
-        gSTree.fillStyle(0x4a2e1b);
-        gSTree.fillRect(stw/2 - 4, 52, 8, 38);
-        
-        gSTree.fillStyle(0x1b431b);
-        gSTree.fillCircle(stw/2, 34, 26);
-        gSTree.fillStyle(0x2d7a2d);
-        gSTree.fillCircle(stw/2, 30, 22);
-        gSTree.fillStyle(0x52b752);
-        gSTree.fillCircle(stw/2, 24, 16);
-        gSTree.fillStyle(0x8ae645);
-        gSTree.fillCircle(stw/2 - 4, 18, 8);
-        gSTree.generateTexture('tex_tree_small', stw, sth);
-
-        // --- 4. Buisson 2.5D (tex_bush : 64x64 px) ---
-        let gBush = this.make.graphics({x:0, y:0, add:false});
-        gBush.fillStyle(0x1b431b);
-        gBush.fillCircle(32, 36, 22);
-        gBush.fillStyle(0x2e7d32);
-        gBush.fillCircle(32, 32, 18);
-        gBush.fillStyle(0x4caf50);
-        gBush.fillCircle(30, 26, 12);
-        // Baies rouges
-        gBush.fillStyle(0xe53935);
-        gBush.fillRect(24, 24, 4, 4);
-        gBush.fillRect(36, 28, 4, 4);
-        gBush.fillRect(28, 38, 4, 4);
-        gBush.fillRect(40, 36, 4, 4);
-        gBush.generateTexture('tex_bush', ts, ts);
-
-        // --- 5. Falaise Volumétrique 2.5D (tex_cliff : 64x64 px) ---
-        let gCliff = this.make.graphics({x:0, y:0, add:false});
-        // Plateau supérieur herbeux
-        gCliff.fillStyle(0x5c9e2b);
-        gCliff.fillRect(0, 0, ts, 16);
-        gCliff.fillStyle(0x78c028); // Liseré herbe vive
-        gCliff.fillRect(0, 14, ts, 3);
-        // Franges d'herbe qui retombent
-        gCliff.fillStyle(0x46821a);
-        gCliff.fillRect(4, 16, 6, 5);
-        gCliff.fillRect(20, 16, 8, 6);
-        gCliff.fillRect(42, 16, 6, 4);
-        gCliff.fillRect(54, 16, 6, 7);
-
-        // Paroi rocheuse verticale avec strates horizontales
-        gCliff.fillStyle(0x616161); // Base pierre grise
-        gCliff.fillRect(0, 20, ts, ts - 20);
-        gCliff.fillStyle(0x424242); // Strate sombre et fissures
-        gCliff.fillRect(0, 32, ts, 4);
-        gCliff.fillRect(16, 36, 8, 12);
-        gCliff.fillRect(40, 26, 12, 8);
-        gCliff.fillRect(0, 52, ts, 4);
-        gCliff.fillStyle(0x9e9e9e); // Arêtes et reflets
-        gCliff.fillRect(0, 22, ts, 2);
-        gCliff.fillRect(12, 30, 16, 2);
-        gCliff.fillRect(36, 48, 20, 2);
-        gCliff.generateTexture('tex_cliff', ts, ts);
-
-        // --- 6. Chalet Fantasy 2.5D (tex_house : 192x240 px) ---
-        let gHouse = this.make.graphics({x:0, y:0, add:false});
-        let hw = ts * 3; // 192 px
-        let hh = ts * 3 + 48; // 240 px
-
-        // Cheminée en pierre sur la droite
-        gHouse.fillStyle(0x607d8b);
-        gHouse.fillRect(hw - 36, 16, 22, 70);
-        gHouse.fillStyle(0x37474f); // Briques
-        gHouse.fillRect(hw - 36, 28, 22, 3);
-        gHouse.fillRect(hw - 36, 46, 22, 3);
-        gHouse.fillRect(hw - 36, 64, 22, 3);
-        gHouse.fillStyle(0x263238); // Chapeau de cheminée
-        gHouse.fillRect(hw - 40, 12, 30, 6);
-
-        // Toit en bâtière 3/4 perspective (tuiles terre cuite)
-        // Rangées de tuiles rouges / orange
-        gHouse.fillStyle(0xc0392b);
-        gHouse.fillRect(12, 30, hw - 24, 76);
-        gHouse.fillStyle(0xd35400);
-        gHouse.fillRect(16, 44, hw - 32, 10);
-        gHouse.fillRect(14, 64, hw - 28, 10);
-        gHouse.fillRect(12, 84, hw - 24, 10);
-        gHouse.fillStyle(0xba4a00); // Lignes d'ombre des tuiles
-        gHouse.fillRect(12, 54, hw - 24, 3);
-        gHouse.fillRect(12, 74, hw - 24, 3);
-        gHouse.fillRect(12, 94, hw - 24, 3);
-        // Faîtage éclairé
-        gHouse.fillStyle(0xf39c12);
-        gHouse.fillRect(8, 26, hw - 16, 6);
-
-        // Débord d'avant-toit et ombre portée sur la façade
-        gHouse.fillStyle(0x4a2e1b);
-        gHouse.fillRect(6, 102, hw - 12, 6);
-        gHouse.fillStyle(0x1a0f0a); // Ombre sous le toit
-        gHouse.fillRect(8, 108, hw - 16, 8);
-
-        // Façade à colombages (panneaux crème et poutres en chêne foncé)
-        gHouse.fillStyle(0xfef9e7); // Plâtre crème
-        gHouse.fillRect(12, 114, hw - 24, 106);
-
-        // Poutres verticales et horizontales
-        gHouse.fillStyle(0x4e342e);
-        gHouse.fillRect(12, 114, 8, 106); // Poutre gauche
-        gHouse.fillRect(hw - 20, 114, 8, 106); // Poutre droite
-        gHouse.fillRect(12, 160, hw - 24, 8); // Poutre intermédiaire
-        // Poutres diagonales (croix de Saint-André)
-        gHouse.fillRect(40, 114, 8, 46);
-        gHouse.fillRect(hw - 48, 114, 8, 46);
-
-        // Fenêtres illuminées (lumière intérieure dorée chaleureuse)
-        // Fenêtre gauche
-        gHouse.fillStyle(0x5d4037); // Volets
-        gHouse.fillRect(24, 126, 4, 24);
-        gHouse.fillRect(46, 126, 4, 24);
-        gHouse.fillStyle(0xffca28); // Vitre allumée
-        gHouse.fillRect(28, 126, 18, 24);
-        gHouse.fillStyle(0xfff9c4);
-        gHouse.fillRect(30, 128, 6, 8);
-        gHouse.fillStyle(0x3e2723); // Croisillons
-        gHouse.fillRect(36, 126, 2, 24);
-        gHouse.fillRect(28, 137, 18, 2);
-
-        // Fenêtre droite
-        gHouse.fillStyle(0x5d4037);
-        gHouse.fillRect(hw - 50, 126, 4, 24);
-        gHouse.fillRect(hw - 28, 126, 4, 24);
-        gHouse.fillStyle(0xffca28);
-        gHouse.fillRect(hw - 46, 126, 18, 24);
-        gHouse.fillStyle(0xfff9c4);
-        gHouse.fillRect(hw - 44, 128, 6, 8);
-        gHouse.fillStyle(0x3e2723);
-        gHouse.fillRect(hw - 38, 126, 2, 24);
-        gHouse.fillRect(hw - 46, 137, 18, 2);
-
-        // Porte d'entrée en bois avec ferrures
-        gHouse.fillStyle(0x6d4c41);
-        gHouse.fillRect(hw/2 - 16, 168, 32, 52);
-        gHouse.fillStyle(0x4e342e); // Lattes verticales
-        gHouse.fillRect(hw/2 - 6, 168, 2, 52);
-        gHouse.fillRect(hw/2 + 6, 168, 2, 52);
-        gHouse.fillStyle(0x111111); // Poignée et gonds
-        gHouse.fillRect(hw/2 + 8, 192, 4, 6);
-        gHouse.fillRect(hw/2 - 14, 174, 6, 3);
-        gHouse.fillRect(hw/2 - 14, 206, 6, 3);
-
-        // Soubassement en pierre de taille
-        gHouse.fillStyle(0x78909c);
-        gHouse.fillRect(10, 220, hw - 20, 16);
-        gHouse.fillStyle(0x455a64);
-        gHouse.fillRect(10, 226, hw - 20, 2);
-        gHouse.fillRect(40, 220, 2, 16);
-        gHouse.fillRect(90, 220, 2, 16);
-        gHouse.fillRect(140, 220, 2, 16);
-        gHouse.generateTexture('tex_house', hw, hh);
-
-        // --- 7. Ruine Antique 2.5D (tex_ruin : 64x80 px) ---
-        let gRuin = this.make.graphics({x:0, y:0, add:false});
-        gRuin.fillStyle(0x424242);
-        gRuin.fillRect(12, 16, 40, 60);
-        gRuin.fillStyle(0x757575);
-        gRuin.fillRect(16, 16, 32, 60);
-        // Cannelures de colonne
-        gRuin.fillStyle(0x9e9e9e);
-        gRuin.fillRect(20, 22, 4, 48);
-        gRuin.fillRect(28, 22, 4, 48);
-        gRuin.fillRect(36, 22, 4, 48);
-        // Chapiteau et fissures
-        gRuin.fillStyle(0xbdbdbd);
-        gRuin.fillRect(10, 12, 44, 8);
-        gRuin.fillStyle(0x212121);
-        gRuin.fillRect(24, 34, 12, 4);
-        gRuin.fillRect(32, 38, 4, 10);
-        // Lierre grimpant
-        gRuin.fillStyle(0x2e7d32);
-        gRuin.fillRect(14, 42, 6, 6);
-        gRuin.fillRect(16, 54, 8, 6);
-        gRuin.fillRect(38, 58, 6, 6);
-        gRuin.generateTexture('tex_ruin', ts, ts + 16);
-
-        // --- 8. Petite Ruine / Rocher 2.5D (tex_ruin_small : 64x48 px) ---
-        let gRock = this.make.graphics({x:0, y:0, add:false});
-        gRock.fillStyle(0x424242);
-        gRock.fillCircle(32, 26, 18);
-        gRock.fillStyle(0x757575);
-        gRock.fillCircle(30, 24, 15);
-        gRock.fillStyle(0x9e9e9e);
-        gRock.fillCircle(26, 20, 9);
-        gRock.fillStyle(0x2e7d32); // Mousse
-        gRock.fillRect(28, 28, 8, 4);
-        gRock.generateTexture('tex_ruin_small', ts, 48);
-
-        // --- 9. Panneau indicateur 2.5D (tex_sign) ---
-        let gSign = this.make.graphics({x:0, y:0, add:false});
-        gSign.fillStyle(0x4a2e1b);
-        gSign.fillRect(ts/2 - 4, 28, 8, 32);
-        gSign.fillStyle(0x8a6235);
-        gSign.fillRect(ts/2 - 18, 14, 36, 16);
-        gSign.fillStyle(0x3a2512); // Flèche gravée
-        gSign.fillRect(ts/2 - 10, 20, 16, 3);
-        gSign.fillRect(ts/2 + 6, 18, 3, 7);
-        gSign.generateTexture('tex_sign', ts, ts);
-
-        // --- 10. Clôture 2.5D (tex_fence) ---
-        let gFence = this.make.graphics({x:0, y:0, add:false});
-        gFence.fillStyle(0x4e342e);
-        gFence.fillRect(8, 16, 8, 44);
-        gFence.fillRect(ts - 16, 16, 8, 44);
-        gFence.fillStyle(0x8a6235);
-        gFence.fillRect(4, 24, ts - 8, 6);
-        gFence.fillRect(4, 40, ts - 8, 6);
-        gFence.generateTexture('tex_fence', ts, ts);
-
-        // --- 11. Coffre au trésor 2.5D (tex_chest_closed / opened) ---
-        let gChest = this.make.graphics({x:0, y:0, add:false});
-        gChest.fillStyle(0x5d4037);
-        gChest.fillRect(14, 20, 36, 28);
-        gChest.fillStyle(0x8d6e63);
-        gChest.fillRect(16, 22, 32, 24);
-        // Ferrures dorées et serrure
-        gChest.fillStyle(0xffb300);
-        gChest.fillRect(14, 30, 36, 4);
-        gChest.fillRect(30, 30, 6, 10);
-        gChest.fillStyle(0x000000);
-        gChest.fillRect(32, 34, 2, 4);
-        gChest.generateTexture('tex_chest_closed', ts, ts);
-
-        let gChestO = this.make.graphics({x:0, y:0, add:false});
-        gChestO.fillStyle(0x5d4037);
-        gChestO.fillRect(14, 26, 36, 24);
-        gChestO.fillStyle(0x211005); // Intérieur sombre
-        gChestO.fillRect(18, 28, 28, 12);
-        // Couvercle relevé en 3D
-        gChestO.fillStyle(0x8d6e63);
-        gChestO.fillRect(14, 12, 36, 12);
-        gChestO.fillStyle(0xffb300);
-        gChestO.fillRect(14, 16, 36, 3);
-        gChestO.generateTexture('tex_chest_opened', ts, ts);
-
-        // --- 12. PNJ Cristal 2.5D (tex_npc) ---
-        let gNpc = this.make.graphics({x:0, y:0, add:false});
-        // Socle en pierre ornée
-        gNpc.fillStyle(0x455a64);
-        gNpc.fillRect(16, 40, 32, 16);
-        gNpc.fillStyle(0x78909c);
-        gNpc.fillRect(18, 38, 28, 4);
-        // Cristal cyan flottant
-        gNpc.fillStyle(0x00e5ff);
-        gNpc.fillRect(26, 12, 12, 22);
-        gNpc.fillRect(28, 6, 8, 34);
-        gNpc.fillStyle(0xffffff); // Reflet
-        gNpc.fillRect(30, 10, 4, 14);
-        gNpc.generateTexture('tex_npc', ts, ts);
-
-        // --- 13. Particule feuille (tex_leaf) ---
-        let gLeaf = this.make.graphics({x:0, y:0, add:false});
-        gLeaf.fillStyle(0x7cb342, 0.9);
-        gLeaf.fillRect(0, 0, 6, 6);
-        gLeaf.generateTexture('tex_leaf', 6, 6);
-
-        // --- 14. Mur intérieur (tex_wall) ---
-        let gWall = this.make.graphics({x:0, y:0, add:false});
-        gWall.fillStyle(0x4e342e);
-        gWall.fillRect(0, 0, ts, ts);
-        gWall.fillStyle(0x3e2723);
-        gWall.fillRect(0, ts - 8, ts, 8);
-        gWall.fillStyle(0x6d4c41);
-        gWall.fillRect(0, 16, ts, 2);
-        gWall.fillRect(0, 36, ts, 2);
-        gWall.generateTexture('tex_wall', ts, ts);
+        PixelArt.generate(this, ts);
+        if (!this.anims.exists('water-flow')) {
+            this.anims.create({ key: 'water-flow', frames: [0, 1, 2].map(i => ({ key: `tex_water_${i}` })), frameRate: 3, repeat: -1 });
+        }
     }
 
     handleInteraction(playerHitbox, interactiveZone) {
         if(interactiveZone.npcData) {
             let npc = interactiveZone.npcData;
-            this.events.emit('StartDialogue', npc.name, npc.dialogue, () => {});
+            const dialogue = this.tutorial ? this.tutorial.onGuideInteraction(npc) : npc.dialogue;
+            this.events.emit('StartDialogue', npc.name, dialogue, () => {});
             if (window.gameState && window.gameState.completeQuestGoal) {
                 window.gameState.completeQuestGoal('talk', npc.id);
             }
@@ -938,9 +689,13 @@ class WorldScene extends Phaser.Scene {
         else if (interactiveZone.chestData) {
             let chest = interactiveZone.chestData;
             if(!chest.opened) {
+                if (this.tutorial && !this.tutorial.canOpenChest(chest.id)) return;
                 chest.opened = true;
                 interactiveZone.sprite.setTexture('tex_chest_opened');
+                window.gameState.markWorldObject('openedChests', chest.id);
                 window.gameState.addItem(chest.item);
+                if (this.tutorial) this.tutorial.onChestOpened(chest.id);
+                this.events.emit('ItemCollected', `${chest.item.name} ×${chest.item.qty}`);
                 
                 let txt = this.add.text(this.player.x, this.player.y - 50, `Obtenu: ${chest.item.name} x${chest.item.qty}`, { fontSize: '12px', color: '#ffff00', fontFamily: '"Press Start 2P"', stroke: '#000', strokeThickness: 4 });
                 txt.setDepth(9002);
@@ -950,20 +705,26 @@ class WorldScene extends Phaser.Scene {
         }
     }
 
-    update() {
+    update(time, delta) {
         if (window.gameState.player.hp <= 0) {
             if (!this.isDead) {
                 this.isDead = true;
+                this.controlsLocked = true;
+                this.player.cancelAttack();
                 this.player.setTint(0xff0000);
                 this.player.active = false;
                 this.player.setVelocity(0);
                 let txt = this.add.text(this.player.x, this.player.y - 20, "GAME OVER", { fontSize: '32px', fontFamily: '"Press Start 2P"', color: '#ff0000', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setDepth(10000);
-                this.time.delayedCall(3000, () => window.location.reload());
+                this.time.delayedCall(1800, () => {
+                    window.gameState.restoreAtCheckpoint();
+                    this.scene.stop('HUDScene');
+                    this.scene.restart({ map: 'Village' });
+                });
             }
             return;
         }
 
-        this.player.update();
+        this.player.update(time, delta);
         
         // Synchronisation de l'ombre au sol du joueur (baseY - 0.5)
         if (this.playerShadow) {
@@ -988,79 +749,55 @@ class WorldScene extends Phaser.Scene {
             this.occlusionManager.update(this.player);
         }
 
-        if (this.targetMapName === "Village") {
-            this.updateTutorial();
+        if (this.tutorial) this.tutorial.update();
+        this.updateInteractionTarget();
+    }
+
+    updateInteractionTarget() {
+        this.interactionTarget = null;
+        let closest = 100;
+        for (const zone of this.interactiveZones.getChildren()) {
+            if (!zone.active) continue;
+            if (zone.chestData && zone.chestData.opened) continue;
+            const dx = zone.x - this.player.x;
+            const dy = zone.y - this.player.y;
+            const distance = Math.hypot(dx, dy);
+            const inFront = (this.player.facing === 'left' && dx <= 20) ||
+                (this.player.facing === 'right' && dx >= -20) ||
+                (this.player.facing === 'up' && dy <= 20) ||
+                (this.player.facing === 'down' && dy >= -20);
+            if (distance < closest && inFront) {
+                closest = distance;
+                this.interactionTarget = zone;
+            }
         }
+        const zone = this.interactionTarget;
+        for (const interactive of this.interactiveZones.getChildren()) {
+            if (interactive.questIndicator) interactive.questIndicator.setVisible(!window.gameState.world.tutorial.completed);
+        }
+        this.interactionHint = !zone ? '' : zone.npcData ? '[E] Parler au guide' :
+            (this.tutorial && !this.tutorial.canOpenChest(zone.chestData.id)) ? 'Vaincre la sentinelle pour ouvrir' : '[E] Ouvrir le coffre';
     }
 
-    setupTutorial() {
-        this.tutorialTexts = [];
-        const ts = this.currentMapData.tileSize;
-        
-        const addTutorialText = (x, y, text) => {
-            let t = this.add.text(x * ts + ts/2, y * ts, text, {
-                fontSize: '10px',
-                fontFamily: '"Press Start 2P"',
-                color: '#ffffff',
-                backgroundColor: '#000000cc',
-                padding: { x: 8, y: 8 },
-                align: 'center',
-                stroke: '#000',
-                strokeThickness: 2
-            }).setOrigin(0.5).setAlpha(0);
-            t.setDepth(9002);
-            this.tutorialTexts.push({ obj: t, triggerX: x * ts + ts/2, triggerY: y * ts + ts/2, active: false, done: false, condition: null });
-            return t;
-        };
-
-        let t1 = addTutorialText(5, 4.5, "Déplace-toi avec\nZQSD ou Flèches");
-        this.tutorialTexts[0].condition = () => this.player.body.velocity.length() > 0;
-        this.tutorialTexts[0].active = true;
-        this.tutorialTexts[0].obj.setAlpha(1);
-
-        let t2 = addTutorialText(10, 8.5, "[E] Interagir");
-        this.tutorialTexts[1].triggerDist = 150;
-        this.tutorialTexts[1].condition = () => this.scene.get('HUDScene').isDialogueActive;
-
-        let t3 = addTutorialText(10, 13.5, "[Espace] Couper");
-        this.tutorialTexts[2].triggerDist = 150;
-        this.tutorialTexts[2].condition = () => this.player.isAttacking;
-
-        let t4 = addTutorialText(10, 19.5, "Combat!\n[Espace] Attaquer\n[1] Potion");
-        this.tutorialTexts[3].triggerDist = 250;
-        this.tutorialTexts[3].condition = () => window.gameState.player.hp < window.gameState.player.maxHp || this.enemies.countActive() === 0;
-    }
-
-    updateTutorial() {
-        if (!this.tutorialTexts) return;
-        this.tutorialTexts.forEach(step => {
-            if (step.done) return;
-            if (!step.active && step.triggerDist) {
-                let dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, step.triggerX, step.triggerY);
-                if (dist < step.triggerDist) {
-                    step.active = true;
-                    this.tweens.add({ targets: step.obj, alpha: 1, duration: 500 });
-                }
-            }
-            if (step.active && step.condition && step.condition()) {
-                step.done = true;
-                this.tweens.add({ targets: step.obj, alpha: 0, duration: 500 });
-            }
-        });
+    onEnemyDefeated(id) {
+        window.gameState.markWorldObject('defeatedEnemies', id);
+        if (this.tutorial) this.tutorial.onEnemyDefeated(id);
     }
 
     hitMinorEnemy(weaponBox, enemy) {
-        if (!enemy.isFlashing) {
+        if (!this.controlsLocked && !enemy.isFlashing && this.player.canHitTarget(enemy)) {
             let dmg = window.gameState ? window.gameState.player.damage : 10;
-            enemy.takeDamage(dmg);
+            enemy.takeDamage(dmg, this.player);
             this.cameras.main.shake(100, 0.005);
             if (window.audioManager) window.audioManager.play('hit');
         }
     }
 
     hitResource(weaponBox, resZone) {
-        if (resZone.isDestroyed) return;
+        if (this.controlsLocked || resZone.isDestroyed || !this.player.canHitTarget(resZone)) return;
         resZone.isDestroyed = true;
+        window.gameState.markWorldObject('clearedResources', resZone.resourceId);
+        if (this.tutorial) this.tutorial.onResourceCleared(resZone.resourceId);
         
         this.cameras.main.shake(50, 0.005);
         
@@ -1075,6 +812,7 @@ class WorldScene extends Phaser.Scene {
         let itemId = 'wood';
         let itemName = 'Bois';
         window.gameState.addItem({ id: itemId, name: itemName, qty: 1 });
+        this.events.emit('ItemCollected', `+1 ${itemName}`);
         if (window.audioManager) window.audioManager.play('collect');
         
         let txt = this.add.text(resZone.x, resZone.y - 20, `+1 ${itemName}`, { fontSize: '10px', fontFamily: '"Press Start 2P"', color: '#ffffff', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5).setDepth(9002);
@@ -1086,6 +824,11 @@ class WorldScene extends Phaser.Scene {
     }
 
     enterDoor(player, doorZone) {
+        if (this.controlsLocked || this.isTransitioning) return;
+        this.isTransitioning = true;
+        this.controlsLocked = true;
+        this.player.cancelAttack();
+        this.player.setVelocity(0);
         let door = doorZone.doorData;
         this.scene.stop('HUDScene');
         this.cameras.main.fadeOut(300, 0, 0, 0);
