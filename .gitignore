@@ -6,6 +6,7 @@
 
 # Dependency directories
 node_modules/
+/work/
 
 # OS metadata
 .DS_Store
