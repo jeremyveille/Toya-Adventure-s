@@ -64,6 +64,7 @@ class WorldScene extends Phaser.Scene {
 
     preload() {
         this.load.spritesheet('toya', 'assets/village/toya-walk.png', { frameWidth: 32, frameHeight: 48 });
+        this.load.image('saule', 'assets/village/saule.png');
         this.load.image('gardien', 'assets/village/gardien.png');
     }
 
@@ -94,8 +95,7 @@ class WorldScene extends Phaser.Scene {
         terrainGraphics.setDepth(0);
         let dirtGraphics = this.add.graphics();
         dirtGraphics.setDepth(1);
-        let waterOverlapGraphics = this.add.graphics();
-        waterOverlapGraphics.setDepth(2);
+        const waterCells = [];
         
         let spawnX = ts * 5 + ts/2, spawnY = ts * 3 + ts/2;
         let houseCells = [];
@@ -110,19 +110,19 @@ class WorldScene extends Phaser.Scene {
                 let cy = py + ts/2;
 
                 // --- Base Herbe et Sol ---
-                if (cell !== 'w' && cell !== 'f' && cell !== 'W' && cell !== 'B') {
+                if (this.targetMapName !== 'House1' && cell !== 'W' && cell !== 'B') {
                     // Base Herbe riche et chaleureuse (Akira Toriyama fantasy style)
-                    terrainGraphics.fillStyle(0x5c9e2b);
+                    terrainGraphics.fillStyle(0x88aa66);
                     terrainGraphics.fillRect(px, py, ts, ts);
                     
                     // Touffes d'herbe et fleurs procédurales
                     let rand = (x * 13 + y * 7) % 100;
                     if (rand < 55) {
-                        terrainGraphics.fillStyle(0x46821a); // Touffes vert foncé
+                        terrainGraphics.fillStyle(0x729454); // Touffes vert foncé
                         terrainGraphics.fillRect(px + 8, py + 16, 8, 4);
                         terrainGraphics.fillRect(px + 12, py + 12, 4, 4);
                         terrainGraphics.fillRect(px + 40, py + 44, 12, 4);
-                        terrainGraphics.fillStyle(0x6eb532); // Reflet soleil
+                        terrainGraphics.fillStyle(0xacc57b); // Reflet soleil
                         terrainGraphics.fillRect(px + 8, py + 14, 4, 2);
                     }
                     if (rand < 18) { // Fleurs multicolores (marguerites, boutons d'or, coquelicots)
@@ -142,72 +142,37 @@ class WorldScene extends Phaser.Scene {
 
                 // --- Eau encaissée (-20px) 2.5D ---
                 if (cell === 'W') {
-                    // Lit de rivière encaissé avec ombre de berge nord
-                    terrainGraphics.fillStyle(0x1a4b66); // Ombre de la berge nord
-                    terrainGraphics.fillRect(px, py, ts, ts);
-                    terrainGraphics.fillStyle(0x256588); // Corps de l'eau
-                    terrainGraphics.fillRect(px, py + 8, ts, ts - 8);
-                    
-                    // Vagues et reflets
-                    terrainGraphics.fillStyle(0xa8e6cf);
-                    terrainGraphics.fillRect(px + 12, py + 18, 20, 3);
-                    terrainGraphics.fillRect(px + 36, py + 42, 16, 3);
-                    terrainGraphics.fillStyle(0xffffff); // Reflet miroitant
-                    terrainGraphics.fillRect(px + 24, py + 20, 6, 2);
-                    
+                    const northBank = y > 0 && !['W', 'B'].includes(layout[y - 1][x]);
+                    terrainGraphics.fillStyle(0x417e89).fillRect(px, py, ts, ts);
+                    if (northBank) {
+                        terrainGraphics.fillStyle(0x584e3d).fillRect(px, py, ts, 7);
+                        terrainGraphics.fillStyle(0x537456).fillRect(px, py, ts, 3);
+                        terrainGraphics.fillStyle(0x356c76).fillRect(px, py + 7, ts, 7);
+                    }
+                    waterCells.push({ x: px, y: py, seed: (x * 23 + y * 11) % 41 });
+
                     // Mur bloquant l'eau
                     this.createWall(cx, cy, ts);
                 }
 
                 // --- Pont en bois 2.5D surélevé avec garde-corps ---
                 if (cell === 'B') {
-                    // Eau sous le pont
-                    terrainGraphics.fillStyle(0x1a4b66);
-                    terrainGraphics.fillRect(px, py, ts, ts);
-                    terrainGraphics.fillStyle(0x256588);
-                    terrainGraphics.fillRect(px, py + 8, ts, ts - 8);
-
-                    // Tablier de pont en bois surélevé
-                    terrainGraphics.fillStyle(0x3e2723); // Ombre portée du tablier
-                    terrainGraphics.fillRect(px, py + 14, ts, ts - 16);
-                    terrainGraphics.fillStyle(0x8a6235); // Planches de chêne
-                    terrainGraphics.fillRect(px, py + 10, ts, ts - 20);
-                    
-                    // Lattes de bois et clous
-                    terrainGraphics.fillStyle(0x4e342e);
-                    terrainGraphics.fillRect(px, py + 18, ts, 2);
-                    terrainGraphics.fillRect(px, py + 32, ts, 2);
-                    terrainGraphics.fillRect(px, py + 46, ts, 2);
-
-                    // Garde-corps latéraux
-                    let isWestEdge = x > 0 && layout[y][x - 1] === 'W';
-                    let isEastEdge = x < width - 1 && layout[y][x + 1] === 'W';
-
-                    if (isWestEdge) {
-                        let gRailingW = this.add.graphics();
-                        gRailingW.fillStyle(0x4a2e1b);
-                        gRailingW.fillRect(px + 2, py + 4, 6, ts - 8);
-                        gRailingW.fillStyle(0x8a6235);
-                        gRailingW.fillRect(px + 1, py + 2, 8, 4);
-                        gRailingW.setDepth(Math.floor(cy + ts * 0.5));
-                        this.createWall(px + 4, cy, 8, ts);
+                    terrainGraphics.fillStyle(0x775336).fillRect(px, py, ts, ts);
+                    for (let plank = 0; plank < ts; plank += 8) {
+                        const tone = (x + plank / 8) % 3 ? 0xbd9464 : 0xb58a5d;
+                        terrainGraphics.fillStyle(tone).fillRect(px, py + plank, ts, 7);
+                        terrainGraphics.fillStyle(0xe2bc84).fillRect(px, py + plank, ts, 1);
+                        terrainGraphics.fillStyle(0x8d684a).fillRect(px + (plank * 3 + x) % 38, py + plank + 4, 15, 1);
                     }
-                    if (isEastEdge) {
-                        let gRailingE = this.add.graphics();
-                        gRailingE.fillStyle(0x4a2e1b);
-                        gRailingE.fillRect(px + ts - 8, py + 4, 6, ts - 8);
-                        gRailingE.fillStyle(0x8a6235);
-                        gRailingE.fillRect(px + ts - 9, py + 2, 8, 4);
-                        gRailingE.setDepth(Math.floor(cy + ts * 0.5));
-                        this.createWall(px + ts - 4, cy, 8, ts);
-                    }
+                    if (layout[y][x - 1] === 'W') this.createRailing(px + 4, py, ts);
+                    if (layout[y][x + 1] === 'W') this.createRailing(px + ts - 4, py, ts);
                 }
 
                 // --- Intérieur (House 1) ---
-                if (cell === 'f' || cell === 'w') {
+                if (this.targetMapName === 'House1') {
                     terrainGraphics.fillStyle(0x151515);
                     terrainGraphics.fillRect(px, py, ts, ts);
-                    if (cell === 'f') {
+                    if (cell !== 'w') {
                         // Parquet en bois intérieur
                         dirtGraphics.fillStyle(0x8a6b4e);
                         dirtGraphics.fillRect(px + 4, py + 4, ts - 8, ts - 8);
@@ -236,14 +201,14 @@ class WorldScene extends Phaser.Scene {
 
                 // --- Chemin de terre et auto-tiling organique ---
                 if (cell === 'd') {
-                    dirtGraphics.fillStyle(0xc49a62); // Terre battue
+                    dirtGraphics.fillStyle(0xcfb385); // Terre battue
                     dirtGraphics.fillRect(px, py, ts, ts);
                     
                     // Gravillons et ornières
-                    dirtGraphics.fillStyle(0xa37b4a);
+                    dirtGraphics.fillStyle(0xaa906a);
                     dirtGraphics.fillRect(px + 16, py + 16, 4, 4);
                     dirtGraphics.fillRect(px + 44, py + 32, 6, 4);
-                    dirtGraphics.fillStyle(0xdeb887);
+                    dirtGraphics.fillStyle(0xe1ca9c);
                     dirtGraphics.fillRect(px + 28, py + 48, 8, 4);
 
                     // Bords herbeux organiques
@@ -252,7 +217,7 @@ class WorldScene extends Phaser.Scene {
                     let left = x > 0 ? layout[y][x-1] : null;
                     let right = x < width-1 ? layout[y][x+1] : null;
 
-                    dirtGraphics.fillStyle(0x5c9e2b);
+                    dirtGraphics.fillStyle(0x88aa66);
                     if (top !== 'd') {
                         dirtGraphics.fillRect(px, py, ts, 8);
                         dirtGraphics.fillRect(px + 12, py + 8, 16, 8);
@@ -306,6 +271,24 @@ class WorldScene extends Phaser.Scene {
             }
         }
 
+        if (waterCells.length) {
+            const ripples = this.add.graphics().setDepth(2);
+            let step = 0;
+            const drawWater = () => {
+                ripples.clear();
+                for (const { x, y, seed } of waterCells) {
+                    const phase = (step + seed) % 8;
+                    const offset = Math.abs(phase - 4);
+                    ripples.fillStyle(0x74aba7).fillRect(x + 4 + seed % 20 + offset, y + 19 + seed % 13, 9 + offset, 2);
+                    ripples.fillStyle(0x518f94).fillRect(x + 32 + offset, y + 44 + seed % 12, 16, 2);
+                }
+                step++;
+            };
+            drawWater();
+            this.time.addEvent({ delay: 180, loop: true, callback: drawWater });
+        }
+        if (this.currentMapData.terrace) this.buildTerrace(this.currentMapData.terrace, ts, dirtGraphics);
+
         // Bâtiments 2.5D en volume avec toits praticables et occlusion
         this.buildHouses(houseCells, ts);
 
@@ -323,8 +306,8 @@ class WorldScene extends Phaser.Scene {
         this.playerShadow.setDepth(Math.floor(this.player.y) - 0.5);
 
         // --- AMBIANCE & POST-PROCESSING 2.5D ---
-        let overlayColor = this.targetMapName === "House1" ? 0x000000 : 0xdc9233;
-        let overlayAlpha = this.targetMapName === "House1" ? 0.3 : 0.15;
+        let overlayColor = this.targetMapName === "House1" ? 0x000000 : 0xffdda1;
+        let overlayAlpha = this.targetMapName === "House1" ? 0.08 : 0.025;
         let overlay = this.add.rectangle(0, 0, width * ts, height * ts, overlayColor, overlayAlpha).setOrigin(0,0);
         overlay.setBlendMode(this.targetMapName === "House1" ? Phaser.BlendModes.NORMAL : Phaser.BlendModes.ADD);
         overlay.setDepth(9000);
@@ -345,10 +328,11 @@ class WorldScene extends Phaser.Scene {
         }
 
         // --- CAMERA 2.5D ---
-        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        this.cameras.main.setZoom(this.targetMapName === 'House1' ? 2 : 1);
+        this.cameras.main.startFollow(this.player, true, 0.14, 0.14);
         this.cameras.main.setBounds(0, 0, width * ts, height * ts);
         this.cameras.main.setDeadzone(40, 30);
-        this.cameras.main.setZoom(this.targetMapName === "House1" ? 1.8 : 1.5);
+        this.cameras.main.centerOn(spawnX, spawnY);
         this.cameras.main.roundPixels = true;
 
         // --- COLLISIONS & PHYSIQUE ---
@@ -384,69 +368,65 @@ class WorldScene extends Phaser.Scene {
         return sprite;
     }
 
-    createTree(cx, cy, ts, isSmall) {
-        if (!isSmall) {
-            // Grand Arbre Volumétrique 2.5D (Canopée multi-couches et tronc visible)
-            let trunkBaseY = cy + ts * 0.35;
-            // Collider restreint strictement au tronc au sol (~36x18 px)
-            this.createWall(cx, trunkBaseY, 36, 18);
-            
-            let tree = this.add.sprite(cx, trunkBaseY + 5, 'tex_tree');
-            tree.setOrigin(0.5, 0.95);
-            let baseDepth = Math.floor(trunkBaseY + 5);
-            tree.setDepth(baseDepth);
-            
-            // Ombre au sol sous le tronc
-            let shadow = this.add.sprite(cx, trunkBaseY, 'tex_shadow');
-            shadow.setScale(2.4, 1.4);
-            shadow.setDepth(baseDepth - 0.5);
-
-            // Enregistrement de la canopée dans l'OcclusionManager
-            if (this.occlusionManager) {
-                this.occlusionManager.register(
-                    tree,
-                    {
-                        minX: cx - 64,
-                        maxX: cx + 64,
-                        minY: trunkBaseY - 150,
-                        maxY: trunkBaseY - 20
-                    },
-                    0.35,
-                    baseDepth
-                );
-            }
-        } else {
-            // Petit Arbre Volumétrique 2.5D
-            let trunkBaseY = cy + ts * 0.25;
-            this.createWall(cx, trunkBaseY, 24, 14);
-
-            let tree = this.add.sprite(cx, trunkBaseY + 4, 'tex_tree_small');
-            tree.setOrigin(0.5, 0.95);
-            let baseDepth = Math.floor(trunkBaseY + 4);
-            tree.setDepth(baseDepth);
-
-            let shadow = this.add.sprite(cx, trunkBaseY, 'tex_shadow');
-            shadow.setScale(1.5, 1.0);
-            shadow.setDepth(baseDepth - 0.5);
-
-            if (this.occlusionManager) {
-                this.occlusionManager.register(
-                    tree,
-                    {
-                        minX: cx - 32,
-                        maxX: cx + 32,
-                        minY: trunkBaseY - 90,
-                        maxY: trunkBaseY - 15
-                    },
-                    0.35,
-                    baseDepth
-                );
+    createRailing(x, y, ts) {
+        this.createWall(x, y + ts / 2, 7, ts);
+        for (let dy = 0; dy < ts; dy += 16) {
+            const foot = y + dy + 16;
+            const rail = this.add.graphics().setDepth(foot);
+            rail.fillStyle(0x5b4432).fillRect(x - 2, foot - 32, 5, 16);
+            rail.fillStyle(0xd3ab75).fillRect(x - 2, foot - 32, 2, 16);
+            if (dy % 32 === 0) {
+                rail.fillStyle(0x694a34).fillRect(x - 4, foot - 23, 8, 24);
+                rail.fillStyle(0xab8055).fillRect(x - 3, foot - 22, 3, 20);
+                rail.fillStyle(0xf1cf93).fillRect(x - 4, foot - 24, 8, 3);
             }
         }
     }
 
+    buildTerrace(data, ts, g) {
+        const x = data.x * ts, y = data.y * ts;
+        const w = data.width * ts, h = data.height * ts;
+        const foot = y + h;
+        g.fillStyle(0x9eae7b).fillRect(x, y, w, h);
+        g.fillStyle(0xbecc95).fillRect(x, y, w, 4);
+        g.fillStyle(0x70845f).fillRect(x + w - 5, y + 4, 5, h - 4);
+        g.fillStyle(0x70695c).fillRect(x, foot, w, 20);
+        for (let i = 0; i < w; i += 16) {
+            g.fillStyle(0x9d9680).fillRect(x + i + 1, foot + 2, 14, 8);
+            g.fillStyle(0x847f70).fillRect(x + i + 4, foot + 12, 11, 5);
+        }
+        const stairs = (data.stairsX - data.x) * ts;
+        for (let n = 0; n < 4; n++) {
+            g.fillStyle(0xb5aa91).fillRect(x + stairs, foot + n * 6, ts, 5);
+            g.fillStyle(0xe3d4b3).fillRect(x + stairs + 2, foot + n * 6, ts - 4, 2);
+        }
+        this.createWall(x + w / 2, y, w, 8);
+        this.createWall(x, y + h / 2, 8, h);
+        this.createWall(x + w, y + h / 2, 8, h);
+        if (stairs > 0) this.createWall(x + stairs / 2, foot + 8, stairs, 20);
+        const right = w - stairs - ts;
+        if (right > 0) this.createWall(x + w - right / 2, foot + 8, right, 20);
+    }
+
+    createTree(cx, cy, ts, isSmall) {
+        const base = Math.floor(cy + ts * (isSmall ? 0.25 : 0.35));
+        const w = isSmall ? 56 : 112;
+        const h = isSmall ? 72 : 144;
+        this.createWall(cx, base - 3, isSmall ? 20 : 30, isSmall ? 10 : 16);
+        this.add.image(cx + 4, base - 2, 'tex_shadow').setScale(isSmall ? 1.2 : 2, 0.8).setDepth(3);
+        const tree = this.add.image(cx, base, 'saule').setOrigin(0.5, 1).setDisplaySize(w, h).setDepth(base);
+        this.occlusionManager.register(tree, {
+            minX: cx - w * 0.42, maxX: cx + w * 0.42,
+            minY: base - h + 6, maxY: base - h * 0.16
+        }, 0.46, base);
+    }
+
     createCliff(cx, cy, ts, x, y, layout, width, height) {
         let hasBelow = y < height - 1 && layout[y + 1][x] === 'C';
+        if (hasBelow) {
+            this.createWall(cx, cy, ts);
+            return; // Surface herbeuse continue au-dessus de la face sud.
+        }
         let cliff = this.add.sprite(cx, cy, 'tex_cliff');
         let baseDepth = Math.floor(cy + ts * 0.5);
         cliff.setDepth(baseDepth);
@@ -606,70 +586,15 @@ class WorldScene extends Phaser.Scene {
     }
 
     generateTextures(ts) {
+        if (this.textures.exists('tex_shadow')) return;
         // --- 1. Ombre au sol (tex_shadow) ---
         let gShadow = this.make.graphics({x:0, y:0, add:false});
         gShadow.fillStyle(0x000000, 0.35);
-        gShadow.fillEllipse(16, 10, 30, 16);
-        gShadow.generateTexture('tex_shadow', 32, 20);
-
-        // --- 2. Grand Arbre 2.5D (tex_tree : 128x160 px) ---
-        let gTree = this.make.graphics({x:0, y:0, add:false});
-        let tw = 128, th = 160;
-        
-        // Tronc noueux en bois foncé
-        gTree.fillStyle(0x382214); // Ombre du tronc
-        gTree.fillRect(tw/2 - 14, 80, 28, 70);
-        gTree.fillStyle(0x4a2e1b); // Corps du tronc
-        gTree.fillRect(tw/2 - 10, 80, 20, 70);
-        // Racines évasées
-        gTree.fillRect(tw/2 - 20, 136, 10, 14);
-        gTree.fillRect(tw/2 + 10, 136, 10, 14);
-        gTree.fillStyle(0x2d7a2d); // Mousse au pied
-        gTree.fillRect(tw/2 - 12, 140, 6, 8);
-        gTree.fillRect(tw/2 + 6, 142, 6, 6);
-
-        // Canopée volumétrique 3 couches (Akira Toriyama pixel art)
-        // Couche 1: Vert très sombre (arrière et dessous)
-        gTree.fillStyle(0x1b431b);
-        gTree.fillCircle(tw/2, 50, 48);
-        gTree.fillCircle(tw/2 - 26, 60, 30);
-        gTree.fillCircle(tw/2 + 26, 60, 30);
-        
-        // Couche 2: Vert moyen riche
-        gTree.fillStyle(0x2d7a2d);
-        gTree.fillCircle(tw/2, 44, 40);
-        gTree.fillCircle(tw/2 - 22, 54, 24);
-        gTree.fillCircle(tw/2 + 22, 54, 24);
-        
-        // Couche 3: Vert clair ensoleillé (haut et face avant)
-        gTree.fillStyle(0x52b752);
-        gTree.fillCircle(tw/2, 34, 30);
-        gTree.fillCircle(tw/2 - 16, 44, 18);
-        gTree.fillCircle(tw/2 + 16, 44, 18);
-        
-        // Reflet jaune/vert vif sur la couronne
-        gTree.fillStyle(0x8ae645);
-        gTree.fillCircle(tw/2 - 8, 24, 14);
-        gTree.fillCircle(tw/2 + 10, 26, 10);
-        gTree.generateTexture('tex_tree', tw, th);
-
-        // --- 3. Petit Arbre 2.5D (tex_tree_small : 64x96 px) ---
-        let gSTree = this.make.graphics({x:0, y:0, add:false});
-        let stw = 64, sth = 96;
-        gSTree.fillStyle(0x382214);
-        gSTree.fillRect(stw/2 - 6, 52, 12, 38);
-        gSTree.fillStyle(0x4a2e1b);
-        gSTree.fillRect(stw/2 - 4, 52, 8, 38);
-        
-        gSTree.fillStyle(0x1b431b);
-        gSTree.fillCircle(stw/2, 34, 26);
-        gSTree.fillStyle(0x2d7a2d);
-        gSTree.fillCircle(stw/2, 30, 22);
-        gSTree.fillStyle(0x52b752);
-        gSTree.fillCircle(stw/2, 24, 16);
-        gSTree.fillStyle(0x8ae645);
-        gSTree.fillCircle(stw/2 - 4, 18, 8);
-        gSTree.generateTexture('tex_tree_small', stw, sth);
+        gShadow.fillRect(4, 5, 24, 9);
+        gShadow.fillRect(1, 7, 30, 5);
+        gShadow.fillRect(8, 3, 16, 2);
+        gShadow.fillRect(8, 14, 16, 2);
+        gShadow.generateTexture('tex_shadow', 32, 20).destroy();
 
         // --- 4. Buisson 2.5D (tex_bush : 64x64 px) ---
         let gBush = this.make.graphics({x:0, y:0, add:false});
@@ -685,17 +610,17 @@ class WorldScene extends Phaser.Scene {
         gBush.fillRect(36, 28, 4, 4);
         gBush.fillRect(28, 38, 4, 4);
         gBush.fillRect(40, 36, 4, 4);
-        gBush.generateTexture('tex_bush', ts, ts);
+        gBush.generateTexture('tex_bush', ts, ts).destroy();
 
         // --- 5. Falaise Volumétrique 2.5D (tex_cliff : 64x64 px) ---
         let gCliff = this.make.graphics({x:0, y:0, add:false});
         // Plateau supérieur herbeux
-        gCliff.fillStyle(0x5c9e2b);
+        gCliff.fillStyle(0x88aa66);
         gCliff.fillRect(0, 0, ts, 16);
-        gCliff.fillStyle(0x78c028); // Liseré herbe vive
+        gCliff.fillStyle(0xa8bf76); // Liseré herbe vive
         gCliff.fillRect(0, 14, ts, 3);
         // Franges d'herbe qui retombent
-        gCliff.fillStyle(0x46821a);
+        gCliff.fillStyle(0x729454);
         gCliff.fillRect(4, 16, 6, 5);
         gCliff.fillRect(20, 16, 8, 6);
         gCliff.fillRect(42, 16, 6, 4);
@@ -713,7 +638,7 @@ class WorldScene extends Phaser.Scene {
         gCliff.fillRect(0, 22, ts, 2);
         gCliff.fillRect(12, 30, 16, 2);
         gCliff.fillRect(36, 48, 20, 2);
-        gCliff.generateTexture('tex_cliff', ts, ts);
+        gCliff.generateTexture('tex_cliff', ts, ts).destroy();
 
         // --- 6. Chalet Fantasy 2.5D (tex_house : 192x240 px) ---
         let gHouse = this.make.graphics({x:0, y:0, add:false});
@@ -809,7 +734,7 @@ class WorldScene extends Phaser.Scene {
         gHouse.fillRect(40, 220, 2, 16);
         gHouse.fillRect(90, 220, 2, 16);
         gHouse.fillRect(140, 220, 2, 16);
-        gHouse.generateTexture('tex_house', hw, hh);
+        gHouse.generateTexture('tex_house', hw, hh).destroy();
 
         // --- 7. Ruine Antique 2.5D (tex_ruin : 64x80 px) ---
         let gRuin = this.make.graphics({x:0, y:0, add:false});
@@ -833,7 +758,7 @@ class WorldScene extends Phaser.Scene {
         gRuin.fillRect(14, 42, 6, 6);
         gRuin.fillRect(16, 54, 8, 6);
         gRuin.fillRect(38, 58, 6, 6);
-        gRuin.generateTexture('tex_ruin', ts, ts + 16);
+        gRuin.generateTexture('tex_ruin', ts, ts + 16).destroy();
 
         // --- 8. Petite Ruine / Rocher 2.5D (tex_ruin_small : 64x48 px) ---
         let gRock = this.make.graphics({x:0, y:0, add:false});
@@ -845,7 +770,7 @@ class WorldScene extends Phaser.Scene {
         gRock.fillCircle(26, 20, 9);
         gRock.fillStyle(0x2e7d32); // Mousse
         gRock.fillRect(28, 28, 8, 4);
-        gRock.generateTexture('tex_ruin_small', ts, 48);
+        gRock.generateTexture('tex_ruin_small', ts, 48).destroy();
 
         // --- 9. Panneau indicateur 2.5D (tex_sign) ---
         let gSign = this.make.graphics({x:0, y:0, add:false});
@@ -856,7 +781,7 @@ class WorldScene extends Phaser.Scene {
         gSign.fillStyle(0x3a2512); // Flèche gravée
         gSign.fillRect(ts/2 - 10, 20, 16, 3);
         gSign.fillRect(ts/2 + 6, 18, 3, 7);
-        gSign.generateTexture('tex_sign', ts, ts);
+        gSign.generateTexture('tex_sign', ts, ts).destroy();
 
         // --- 10. Clôture 2.5D (tex_fence) ---
         let gFence = this.make.graphics({x:0, y:0, add:false});
@@ -866,7 +791,7 @@ class WorldScene extends Phaser.Scene {
         gFence.fillStyle(0x8a6235);
         gFence.fillRect(4, 24, ts - 8, 6);
         gFence.fillRect(4, 40, ts - 8, 6);
-        gFence.generateTexture('tex_fence', ts, ts);
+        gFence.generateTexture('tex_fence', ts, ts).destroy();
 
         // --- 11. Coffre au trésor 2.5D (tex_chest_closed / opened) ---
         let gChest = this.make.graphics({x:0, y:0, add:false});
@@ -880,7 +805,7 @@ class WorldScene extends Phaser.Scene {
         gChest.fillRect(30, 30, 6, 10);
         gChest.fillStyle(0x000000);
         gChest.fillRect(32, 34, 2, 4);
-        gChest.generateTexture('tex_chest_closed', ts, ts);
+        gChest.generateTexture('tex_chest_closed', ts, ts).destroy();
 
         let gChestO = this.make.graphics({x:0, y:0, add:false});
         gChestO.fillStyle(0x5d4037);
@@ -892,7 +817,7 @@ class WorldScene extends Phaser.Scene {
         gChestO.fillRect(14, 12, 36, 12);
         gChestO.fillStyle(0xffb300);
         gChestO.fillRect(14, 16, 36, 3);
-        gChestO.generateTexture('tex_chest_opened', ts, ts);
+        gChestO.generateTexture('tex_chest_opened', ts, ts).destroy();
 
         // --- 12. PNJ Cristal 2.5D (tex_npc) ---
         let gNpc = this.make.graphics({x:0, y:0, add:false});
@@ -907,13 +832,13 @@ class WorldScene extends Phaser.Scene {
         gNpc.fillRect(28, 6, 8, 34);
         gNpc.fillStyle(0xffffff); // Reflet
         gNpc.fillRect(30, 10, 4, 14);
-        gNpc.generateTexture('tex_npc', ts, ts);
+        gNpc.generateTexture('tex_npc', ts, ts).destroy();
 
         // --- 13. Particule feuille (tex_leaf) ---
         let gLeaf = this.make.graphics({x:0, y:0, add:false});
         gLeaf.fillStyle(0x7cb342, 0.9);
         gLeaf.fillRect(0, 0, 6, 6);
-        gLeaf.generateTexture('tex_leaf', 6, 6);
+        gLeaf.generateTexture('tex_leaf', 6, 6).destroy();
 
         // --- 14. Mur intérieur (tex_wall) ---
         let gWall = this.make.graphics({x:0, y:0, add:false});
@@ -924,7 +849,7 @@ class WorldScene extends Phaser.Scene {
         gWall.fillStyle(0x6d4c41);
         gWall.fillRect(0, 16, ts, 2);
         gWall.fillRect(0, 36, ts, 2);
-        gWall.generateTexture('tex_wall', ts, ts);
+        gWall.generateTexture('tex_wall', ts, ts).destroy();
     }
 
     handleInteraction(playerHitbox, interactiveZone) {
