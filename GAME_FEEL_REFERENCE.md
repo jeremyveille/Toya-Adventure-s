@@ -16,7 +16,7 @@ Révision auditée : `e83ebb4a4516ade018be45c79d1928c5b34e51de`. Lecture du READ
 
 ## Ce qui est observable dans Phantom Hourglass
 
-La référence est le manuel français illustré de Nintendo (pages imprimées 12–19) et les parcours documentés de l'île Melka et du Temple du Feu. La vidéo méthodologique fournie n'a pas pu être lue dans cet environnement. REA n'est pas installé. L'analyse porte sur les commandes, les captures et les situations décrites, sans extraction de ROM ni chronométrage vidéo.
+La référence est le manuel français illustré de Nintendo (pages imprimées 12–19) et les parcours documentés de l'île Melka et du Temple du Feu. La vidéo méthodologique fournie n'a pas pu être lue dans cet environnement. REA n'est pas installé. L’audit initial s’appuie sur les commandes, les captures et les situations décrites. La mesure sur vidéo figure plus bas.
 
 | Aspect | Observation documentée | Choix pour Toya |
 |---|---|---|
@@ -39,6 +39,12 @@ La partie intégrale fournie par Jérémy montre la version DS avec des textes e
 | [48 min 20 · Temple du Feu](https://youtu.be/aPgtEFwJc9Y?t=2900) | Quatre dalles rouges sont groupées au bord de la lave. Le contour clair de la rive reste visible autour du motif. | Pour le gardien, vérifier que les marques de charge se distinguent de l’herbe et du chemin et que l’espace où esquiver reste visible. |
 
 Ces repères complètent les sources de l’audit initial. Les valeurs de mouvement et de combat de Toya demeurent des réglages propres au projet.
+
+## Du geste à l’impact sur une cible immobile
+
+Dans la [séquence continue d’entraînement de 2 min 26 à 2 min 31](https://archive.org/download/phantom_hourglass_video_guide/part-002_512kb.mp4#t=146,151), Link se tourne vers un poteau à sa droite. La première traînée claire apparaît vers 2 min 27,55 s et le poteau éclate vers 2 min 27,65 s. Ces deux indices visuels sont espacés de trois images dans cet enregistrement à 29,97 images/s, soit environ 100 ms. L’instant de la commande au stylet et celui où le jeu accepterait la commande suivante restent inconnus.
+
+Dans le village de Toya, le contrôle a été effectué dans Chromium, face à la ronce après le dialogue du guide, avec des pas de simulation et de rendu de 1/60 s. L’image 0 est celle où la lame de Toya apparaît. À l’image 5, la zone de frappe est active. À l’image 6 (100 ms), la ronce disparaît, six feuilles jaillissent et le sac reçoit un bois. Ces trois événements sont simultanés et le passage s’ouvre pendant le geste. Les deux jeux ont des repères de départ différents, la traînée chez Link et l’apparition de la lame chez Toya. Le réglage de l’épée de Toya a été conservé.
 
 ## Ordre de réalisation et contrôles
 
