@@ -97,12 +97,16 @@ class WorldScene extends Phaser.Scene {
 
         let terrainGraphics = this.add.graphics();
         terrainGraphics.setDepth(0);
-        let dirtGraphics = this.add.graphics();
-        dirtGraphics.setDepth(1);
+        const dirtGraphics = terrainGraphics;
         const waterCells = [];
         
         let spawnX = ts * 5 + ts/2, spawnY = ts * 3 + ts/2;
         let houseCells = [];
+        const pathAt = (x, y) => {
+            const tile = layout[y]?.[x];
+            return ['d', 'S', 'N', 'B'].includes(tile) ||
+                (passage && (x === passage.gate.x && y === passage.gate.y || tile === '>' && y === 11));
+        };
 
         // 2. Rendu de la carte 2.5D
         for(let y = 0; y < height; y++) {
@@ -119,28 +123,24 @@ class WorldScene extends Phaser.Scene {
                     terrainGraphics.fillStyle(0x88aa66);
                     terrainGraphics.fillRect(px, py, ts, ts);
                     
-                    // Touffes d'herbe et fleurs procédurales
-                    let rand = (x * 13 + y * 7) % 100;
-                    if (rand < 55) {
-                        terrainGraphics.fillStyle(0x729454); // Touffes vert foncé
-                        terrainGraphics.fillRect(px + 8, py + 16, 8, 4);
-                        terrainGraphics.fillRect(px + 12, py + 12, 4, 4);
-                        terrainGraphics.fillRect(px + 40, py + 44, 12, 4);
-                        terrainGraphics.fillStyle(0xacc57b); // Reflet soleil
-                        terrainGraphics.fillRect(px + 8, py + 14, 4, 2);
-                    }
-                    if (rand < 18) { // Fleurs multicolores (marguerites, boutons d'or, coquelicots)
-                        let flowerColor = (rand % 3 === 0) ? 0xffffff : (rand % 3 === 1) ? 0xffd54f : 0xe74c3c;
-                        terrainGraphics.fillStyle(flowerColor);
-                        terrainGraphics.fillRect(px + 32, py + 24, 4, 4);
-                        terrainGraphics.fillStyle(0xfff176); // Centre
-                        terrainGraphics.fillRect(px + 32, py + 26, 4, 2);
-                    }
-                    if (rand > 80 && rand < 90) { // Petits cailloux de prairie
-                        terrainGraphics.fillStyle(0x78909c);
-                        terrainGraphics.fillRect(px + 20, py + 36, 6, 4);
-                        terrainGraphics.fillStyle(0xb0bec5);
-                        terrainGraphics.fillRect(px + 20, py + 34, 4, 2);
+                    // Petites touffes irrégulières. La graine dépend de la case, pas du framerate.
+                    let seed = ((x + 1) * 73856093 ^ (y + 1) * 19349663) >>> 0;
+                    const random = max => {
+                        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+                        return (seed >>> 8) % max;
+                    };
+                    for (let n = 0; n < 9; n++) {
+                        const gx = px + 4 + random(ts - 12), gy = py + 6 + random(ts - 12);
+                        const flowers = n < 2 && (x * 3 + y * 5) % 9 < 3;
+                        terrainGraphics.fillStyle(0x809f61).fillRect(gx - 2, gy, 7 + random(8), 2);
+                        terrainGraphics.fillStyle(0x719358).fillRect(gx, gy - 2, 2, 3);
+                        terrainGraphics.fillRect(gx + 3, gy - 4, 2, 5);
+                        terrainGraphics.fillStyle(0xa4bc76).fillRect(gx + 4, gy - 4, 1, 3);
+                        if (flowers) {
+                            terrainGraphics.fillStyle(n ? 0xe9bd70 : 0xf4ebca).fillRect(gx + 1, gy - 6, 5, 2);
+                            terrainGraphics.fillRect(gx + 3, gy - 8, 2, 5);
+                            terrainGraphics.fillStyle(0xd7a356).fillRect(gx + 3, gy - 6, 2, 2);
+                        }
                     }
                 }
 
@@ -152,6 +152,13 @@ class WorldScene extends Phaser.Scene {
                         terrainGraphics.fillStyle(0x584e3d).fillRect(px, py, ts, 7);
                         terrainGraphics.fillStyle(0x537456).fillRect(px, py, ts, 3);
                         terrainGraphics.fillStyle(0x356c76).fillRect(px, py + 7, ts, 7);
+                        for (let reed = 0; reed < 3; reed++) {
+                            const rx = px + 6 + ((x * 17 + reed * 23) % 48);
+                            const rh = 4 + ((x + reed * 3) % 8);
+                            terrainGraphics.fillStyle(0x57774b).fillRect(rx + 1, py - rh, 2, rh + 3);
+                            terrainGraphics.fillStyle(0xb7bb78).fillRect(rx, py - rh - 2, 1, rh);
+                            terrainGraphics.fillStyle(0x79593a).fillRect(rx - 1, py - rh - 3, 3, 4);
+                        }
                     }
                     waterCells.push({ x: px, y: py, seed: (x * 23 + y * 11) % 41 });
 
@@ -204,7 +211,7 @@ class WorldScene extends Phaser.Scene {
                 }
 
                 // --- Chemin de terre et auto-tiling organique ---
-                if (cell === 'd') {
+                if (cell !== 'B' && pathAt(x, y)) {
                     dirtGraphics.fillStyle(0xcfb385); // Terre battue
                     dirtGraphics.fillRect(px, py, ts, ts);
                     
@@ -216,26 +223,21 @@ class WorldScene extends Phaser.Scene {
                     dirtGraphics.fillRect(px + 28, py + 48, 8, 4);
 
                     // Bords herbeux organiques
-                    let top = y > 0 ? layout[y-1][x] : null;
-                    let bottom = y < height-1 ? layout[y+1][x] : null;
-                    let left = x > 0 ? layout[y][x-1] : null;
-                    let right = x < width-1 ? layout[y][x+1] : null;
-
                     dirtGraphics.fillStyle(0x88aa66);
-                    if (top !== 'd') {
+                    if (!pathAt(x, y - 1)) {
                         dirtGraphics.fillRect(px, py, ts, 8);
                         dirtGraphics.fillRect(px + 12, py + 8, 16, 8);
                         dirtGraphics.fillRect(px + 40, py + 8, 8, 4);
                     }
-                    if (bottom !== 'd') {
+                    if (!pathAt(x, y + 1)) {
                         dirtGraphics.fillRect(px, py + ts - 8, ts, 8);
                         dirtGraphics.fillRect(px + 20, py + ts - 16, 12, 8);
                     }
-                    if (left !== 'd') {
+                    if (!pathAt(x - 1, y)) {
                         dirtGraphics.fillRect(px, py, 8, ts);
                         dirtGraphics.fillRect(px + 8, py + 24, 8, 16);
                     }
-                    if (right !== 'd') {
+                    if (!pathAt(x + 1, y)) {
                         dirtGraphics.fillRect(px + ts - 8, py, 8, ts);
                         dirtGraphics.fillRect(px + ts - 16, py + 16, 8, 12);
                     }
@@ -293,6 +295,11 @@ class WorldScene extends Phaser.Scene {
             this.time.addEvent({ delay: 180, loop: true, callback: drawWater });
         }
         if (this.currentMapData.terrace) this.buildTerrace(this.currentMapData.terrace, ts, dirtGraphics);
+
+        const groundKey = 'sol-' + this.targetMapName;
+        if (!this.textures.exists(groundKey)) terrainGraphics.generateTexture(groundKey, width * ts, height * ts);
+        terrainGraphics.destroy();
+        this.add.image(0, 0, groundKey).setOrigin(0, 0).setDepth(0);
 
         // Bâtiments 2.5D en volume avec toits praticables et occlusion
         this.buildHouses(houseCells, ts);
@@ -352,6 +359,7 @@ class WorldScene extends Phaser.Scene {
 
         this.interactKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
         this.scene.launch('HUDScene');
+        if (window.privacyDialogOpen) this.scene.pause();
     }
 
     createWall(cx, cy, width, height = width) {
@@ -414,8 +422,9 @@ class WorldScene extends Phaser.Scene {
 
     createTree(cx, cy, ts, isSmall) {
         const base = Math.floor(cy + ts * (isSmall ? 0.25 : 0.35));
-        const w = isSmall ? 56 : 112;
-        const h = isSmall ? 72 : 144;
+        const variety = (Math.floor(cx / ts) * 3 + Math.floor(cy / ts)) % 4;
+        const w = (isSmall ? 52 : 100) + variety * 4;
+        const h = (isSmall ? 70 : 132) + variety * 4;
         this.createWall(cx, base - 3, isSmall ? 20 : 30, isSmall ? 10 : 16);
         this.add.image(cx + 4, base - 2, 'tex_shadow').setScale(isSmall ? 1.2 : 2, 0.8).setDepth(3);
         const tree = this.add.image(cx, base, 'saule').setOrigin(0.5, 1).setDisplaySize(w, h).setDepth(base);
@@ -435,15 +444,8 @@ class WorldScene extends Phaser.Scene {
         let baseDepth = Math.floor(cy + ts * 0.5);
         cliff.setDepth(baseDepth);
 
-        // Si la case en-dessous n'est pas une falaise, c'est la paroi verticale frontale
-        if (!hasBelow) {
-            this.createWall(cx, cy + ts * 0.15, ts, ts * 0.7);
-            let shadow = this.add.sprite(cx, cy + ts * 0.45, 'tex_shadow');
-            shadow.setScale(2.2, 0.8);
-            shadow.setDepth(baseDepth - 0.5);
-        } else {
-            this.createWall(cx, cy, ts, ts);
-        }
+        this.createWall(cx, cy + ts * 0.15, ts, ts * 0.7);
+        this.add.image(cx + 2, cy + ts * 0.45, 'tex_shadow').setScale(2.2, 0.8).setDepth(3);
     }
 
     createRuin(cx, cy, ts, isSmall) {
@@ -585,7 +587,7 @@ class WorldScene extends Phaser.Scene {
 
         // Zone de porte d'entrée
         if (this.currentMapData.doorsData && this.currentMapData.doorsData.houseDoorTarget) {
-            let doorZone = this.add.zone(cx, maxY * ts + ts * 0.65, ts * 0.6, ts * 0.7);
+            let doorZone = this.add.zone(cx, baseY - 1, ts * 0.64, ts * 0.45);
             this.physics.add.existing(doorZone, true);
             doorZone.doorData = {
                 targetMap: this.currentMapData.doorsData.houseDoorTarget,
@@ -608,18 +610,25 @@ class WorldScene extends Phaser.Scene {
 
         // --- 4. Buisson 2.5D (tex_bush : 64x64 px) ---
         let gBush = this.make.graphics({x:0, y:0, add:false});
-        gBush.fillStyle(0x1b431b);
-        gBush.fillCircle(32, 36, 22);
-        gBush.fillStyle(0x2e7d32);
-        gBush.fillCircle(32, 32, 18);
-        gBush.fillStyle(0x4caf50);
-        gBush.fillCircle(30, 26, 12);
-        // Baies rouges
-        gBush.fillStyle(0xe53935);
-        gBush.fillRect(24, 24, 4, 4);
-        gBush.fillRect(36, 28, 4, 4);
-        gBush.fillRect(28, 38, 4, 4);
-        gBush.fillRect(40, 36, 4, 4);
+        const leaves = [[13, 33], [22, 26], [33, 22], [44, 28], [51, 35], [33, 34], [20, 37], [40, 38]];
+        gBush.fillStyle(0x534234).fillRect(11, 41, 43, 6);
+        for (const [x, y] of leaves) {
+            gBush.fillStyle(0x344e39).fillRect(x - 9, y - 5, 18, 13);
+            gBush.fillRect(x - 6, y - 9, 12, 19);
+            gBush.fillStyle(0x527448).fillRect(x - 7, y - 6, 13, 11);
+            gBush.fillStyle(0x78944f).fillRect(x - 6, y - 7, 7, 4);
+            gBush.fillStyle(0xa7b85e).fillRect(x - 5, y - 7, 3, 2);
+        }
+        for (let i = 0; i < 36; i++) {
+            const y = 40 - Math.floor(i / 4) + (i % 12 < 4 ? 1 : 0);
+            gBush.fillStyle(0x533b32).fillRect(i + 13, y, 2, 3);
+            if (i % 9 === 0) gBush.fillRect(i + 14, y - 3, 2, 4);
+        }
+        for (const [x, y] of [[14, 32], [23, 22], [30, 35], [41, 26], [49, 34]]) {
+            gBush.fillStyle(0x884c40).fillRect(x, y, 5, 5);
+            gBush.fillStyle(0xd67550).fillRect(x, y, 4, 3);
+            gBush.fillStyle(0xf1ad72).fillRect(x, y, 2, 1);
+        }
         gBush.generateTexture('tex_bush', ts, ts).destroy();
 
         // --- 5. Falaise Volumétrique 2.5D (tex_cliff : 64x64 px) ---
@@ -677,6 +686,13 @@ class WorldScene extends Phaser.Scene {
         gHouse.fillRect(12, 54, hw - 24, 3);
         gHouse.fillRect(12, 74, hw - 24, 3);
         gHouse.fillRect(12, 94, hw - 24, 3);
+        for (let band = 0; band < 4; band++) {
+            const yy = 34 + band * 18;
+            for (let xx = 17 + (band % 2) * 8; xx < hw - 18; xx += 17) {
+                gHouse.fillStyle(0x914632).fillRect(xx, yy, 2, 13);
+                gHouse.fillStyle(0xe09c63).fillRect(xx + 2, yy, 11, 2);
+            }
+        }
         // Faîtage éclairé
         gHouse.fillStyle(0xf39c12);
         gHouse.fillRect(8, 26, hw - 16, 6);
@@ -831,17 +847,19 @@ class WorldScene extends Phaser.Scene {
 
         // --- 12. PNJ Cristal 2.5D (tex_npc) ---
         let gNpc = this.make.graphics({x:0, y:0, add:false});
-        // Socle en pierre ornée
-        gNpc.fillStyle(0x455a64);
-        gNpc.fillRect(16, 40, 32, 16);
-        gNpc.fillStyle(0x78909c);
-        gNpc.fillRect(18, 38, 28, 4);
-        // Cristal cyan flottant
-        gNpc.fillStyle(0x00e5ff);
-        gNpc.fillRect(26, 12, 12, 22);
-        gNpc.fillRect(28, 6, 8, 34);
-        gNpc.fillStyle(0xffffff); // Reflet
-        gNpc.fillRect(30, 10, 4, 14);
+        // Borne de navigation du passeur, taillée dans le schiste et le laiton.
+        gNpc.fillStyle(0x48544d).fillRect(13, 49, 38, 8);
+        gNpc.fillStyle(0x859080).fillRect(15, 46, 34, 6);
+        gNpc.fillStyle(0xc4bda0).fillRect(16, 45, 30, 3);
+        gNpc.fillStyle(0x5c645a).fillRect(20, 34, 24, 11);
+        gNpc.fillStyle(0xa59d81).fillRect(21, 34, 6, 11);
+        gNpc.fillStyle(0xcb9a59).fillRect(18, 32, 28, 4);
+        for (let row = 0; row < 25; row++) {
+            const half = Math.max(1, Math.round(Math.min(row + 1, 25 - row) * 0.7));
+            gNpc.fillStyle(0x355c60).fillRect(32 - half, row + 5, half * 2, 1);
+            gNpc.fillStyle(0x62b8ad).fillRect(33 - half, row + 5, half, 1);
+            if (row > 6 && row < 16) gNpc.fillStyle(0xc4ecce).fillRect(34 - half, row + 5, 2, 1);
+        }
         gNpc.generateTexture('tex_npc', ts, ts).destroy();
 
         // --- 13. Particule feuille (tex_leaf) ---

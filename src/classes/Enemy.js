@@ -18,6 +18,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.home = { x, y };
         this.phase = 'watch';
         this.phaseUntil = 0;
+        this.aiTime = 0;
 
         this.hp = type === 'minor' ? 30 : 100;
         this.isFlashing = false;
@@ -54,12 +55,15 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
     preUpdate(time, delta) {
         super.preUpdate(time, delta);
         this.setDepth(Math.floor(this.y));
-        if (this.enemyType === 'minor' && this.hp > 0) this.updateGuard();
+        if (this.enemyType === 'minor' && this.hp > 0) {
+            this.aiTime += Math.min(delta, 50);
+            this.updateGuard();
+        }
     }
 
     updateGuard() {
         const player = this.scene.player;
-        const now = this.scene.time.now;
+        const now = this.aiTime;
         const c = GameConfig.combat;
         if (!player || !player.active || this.scene.transitioning) {
             this.setVelocity(0);
@@ -97,7 +101,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
             this.phaseUntil = now + c.warningMs;
             this.setTint(0xffcd79);
             this.warning = this.scene.add.graphics().setDepth(this.depth + 1);
-            // Trois chevrons au sol montrent la direction figée de la charge.
+            // Trois repères au sol montrent la direction figée de la charge.
             for (let d = 16; d <= 40; d += 12) {
                 const x = Math.round(this.x + this.aimX * d);
                 const y = Math.round(this.y + this.aimY * d);
@@ -139,10 +143,11 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
             if (bullet && bullet.active) bullet.destroy();
         });
         
-        this.scene.physics.add.overlap(this.scene.player, bullet, (p, b) => {
+        const collider = this.scene.physics.add.overlap(this.scene.player, bullet, (p, b) => {
             if (b && b.active) b.destroy();
             p.takeHit(10);
         }, null, this.scene);
+        bullet.once('destroy', () => collider.destroy());
     }
 
     takeDamage(amount) {
@@ -153,7 +158,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         
         this.clearWarning();
         this.phase = 'hurt';
-        this.phaseUntil = this.scene.time.now + GameConfig.combat.knockbackMs;
+        this.phaseUntil = this.aiTime + GameConfig.combat.knockbackMs;
         this.setTint(0xffaa83);
         const player = this.scene.player;
         const dx = this.x - player.x, dy = this.y - player.y;

@@ -19,7 +19,7 @@ const MapsData = {
             "TTT......ddd.........T...t..t.x..d...x.T",
             "TTTT...ddddddd..T....T..dddddddddddd...T",
             "TTTT...d.....d.......T..S>Nd.....d.....T",
-            "T...b..d..t..d.......T..dddd.....d.....T",
+            "T...b..d..t..d.......T....dd.....d.....T",
             "T..R...d.....d.......T...WWbWWW..d.....T",
             "T...r..d.....d..b....T...WWdWWW..d.....T",
             "WWWWWWWWWWWWWWWWWWWWWWWWWWBBBBWWWWWWWWWW",

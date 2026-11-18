@@ -1,6 +1,6 @@
-# RPG - L'Éveil
+# Toya Adventure’s · Le passage des Saules
 
-Un prototype de jeu RPG 2D en vue de dessus, développé pour le navigateur web. Il s'inspire du style d'Akira Toriyama. Le jeu permet de se déplacer sur une carte, d'interagir et potentiellement de combattre.
+Un action-RPG en pixel-art trois quarts pour navigateur, développé avec Phaser 3 et JavaScript. Dans le village, rejoins le cristal du guide. La ronce rouge, le pont et le gardien conduisent au coffre de la terrasse. Le retour au guide termine le premier niveau.
 
 ## Lancement Rapide
 
@@ -10,7 +10,7 @@ Un prototype de jeu RPG 2D en vue de dessus, développé pour le navigateur web.
 
 ## Tests
 
-Une suite de tests unitaires (vanilla JS exécuté via Node) a été mise en place pour vérifier la logique métier (`GameManager`).
+Les tests Node couvrent l’état de partie, les cartes, le déplacement et les fenêtres de frappe.
 - **Lancer les tests** : `npm test`
 
 Ces tests valident :
@@ -56,7 +56,13 @@ Ces tests valident :
 - **Interaction (Parler, etc.)** : Touche `E`.
 - **Interface** : `I` (Inventaire), `J` (Quêtes), `C` (Crafting).
 
-## Architecture de la Carte
+## Modifier le premier niveau
 
-Les cartes sont gérées dans `src/maps/maps.js`. Il s'agit de tableaux simples (0=herbe, 1=arbre, 2=eau, 3=maison, 4=chemin).
-Ajoutez des zones et des PNJ directement dans les données pour étendre le jeu !
+- `src/data/config.js` regroupe les vitesses, le frein, la portée et le rythme des attaques, les recettes et les consignes du passage.
+- `src/maps/maps.js` définit le village de 40 × 25 cases, la maison, la ronce, le débarcadère, la sentinelle et les marches de la terrasse.
+- `assets/village/` contient les poses du héros, le gardien et le saule au fond transparent, adaptés des images du dépôt.
+- Le journal s’ouvre avec **J**. Dans le sac (**I**), **1** boit une potion et **2** affûte l’épée après avoir trouvé la pierre. **Échap** ferme les menus.
+
+Le scénario de régression navigateur utilise une installation facultative de Playwright pour Python avec Chromium. Avec le jeu lancé par `npm start`, exécuter `python tests/play_village.py`. Le test ouvre une partie de test isolée et pilote les touches jusqu'au retour de la maison. Le jeu lui-même et `npm test` ne nécessitent pas Playwright.
+
+Le diagnostic, les sources et les réglages sont détaillés dans [GAME_FEEL_REFERENCE.md](GAME_FEEL_REFERENCE.md).

@@ -974,6 +974,108 @@ test("T4-SCENARIO", "Passable House Roofs Contract (Feature 17 Architecture)", (
     assert.strictEqual(northOfHouseTile, 'T', "North of house is perimeter wall");
 });
 
+test("VILLAGE", "La diagonale atteint la même vitesse que l'axe, aussi en course", () => {
+    for (const running of [false, true]) {
+        const player = new Player(createMockScene(), 0, 0, 'toya');
+        player.keys.D.isDown = player.keys.Z.isDown = true;
+        player.shiftKey.isDown = running;
+        for (let i = 0; i < 30; i++) player.update(1000 / 60);
+        const limit = running ? GameConfig.movement.runSpeed : GameConfig.movement.walkSpeed;
+        assert.ok(Math.abs(player.body.velocity.length() - limit) < 0.001);
+        const facing = player.facing;
+        player.keys.D.isDown = player.keys.Z.isDown = false;
+        player.update(1000 / 60);
+        assert.ok(player.body.velocity.length() > 0 && player.body.velocity.length() < limit);
+        for (let i = 0; i < 12; i++) player.update(1000 / 60);
+        assert.strictEqual(player.body.velocity.length(), 0);
+        assert.strictEqual(player.facing, facing);
+    }
+});
+
+test("VILLAGE", "La hitbox s'ouvre pendant la frappe dans chacune des quatre directions", () => {
+    const c = GameConfig.combat;
+    for (const [direction, dx, dy] of [['up', 0, -1], ['down', 0, 1], ['left', -1, 0], ['right', 1, 0]]) {
+        const scene = createMockScene();
+        scene.add.graphics = () => ({ clear() {}, fillStyle() {}, fillRect() {}, setDepth() {}, destroy() {} });
+        const player = new Player(scene, 100, 100, 'toya');
+        const box = player.weaponHitbox;
+        box.setSize = (width, height) => Object.assign(box, { width, height });
+        box.body.setSize = () => {};
+        box.body.setEnable = enabled => { box.body.enable = enabled; };
+        box.body.reset = (x, y) => Object.assign(box, { x, y });
+        player.facing = direction;
+        player.performActionAttack();
+        assert.strictEqual(box.body.enable, false);
+        for (let t = 0; t < c.windupMs; t += 10) player.updateAttack(10);
+        assert.strictEqual(box.body.enable, true);
+        assert.strictEqual(Math.sign(box.x - player.x), dx);
+        assert.strictEqual(Math.sign(box.y - (player.y - 5)), dy);
+        for (let t = 0; t < c.strikeMs; t += 10) player.updateAttack(10);
+        assert.strictEqual(box.body.enable, false);
+        assert.strictEqual(player.isAttacking, true);
+        for (let t = 0; t < c.recoverMs; t += 10) player.updateAttack(10);
+        assert.strictEqual(player.isAttacking, false);
+    }
+});
+
+test("VILLAGE", "Le coffre, la navette et la récompense du retour sont attribués une fois", () => {
+    localStorage.setItem('rpg_save_consent', 'true');
+    const gm = new GameManager(GameConfig);
+    const chest = MapsData.Village.chestsData.o;
+    const guide = MapsData.Village.npcsData.N;
+    assert.strictEqual(gm.openChest(chest, true), false);
+    gm.speakToGuide(guide);
+    assert.strictEqual(gm.passage, 'cut');
+    gm.passage = 'open';
+    assert.strictEqual(gm.openChest(chest, true), true);
+    const loaded = new GameManager(GameConfig);
+    assert.ok(loaded.load());
+    assert.strictEqual(loaded.passage, 'return');
+    assert.strictEqual(loaded.openChest(chest, true), false);
+    assert.strictEqual(loaded.useItem('navette'), false);
+    loaded.speakToGuide(guide);
+    const gold = loaded.player.gold;
+    loaded.speakToGuide(guide);
+    assert.strictEqual(loaded.passage, 'done');
+    assert.strictEqual(loaded.player.gold, gold);
+    assert.strictEqual(loaded.quests.find(q => q.id === 'passage').status, 'completed');
+    assert.deepStrictEqual(loaded.inventory.map(i => [i.id, i.qty]), [['potion', 3]]);
+});
+
+test("VILLAGE", "Une sauvegarde antérieure conserve ses objets, son niveau et la quête du guide", () => {
+    const gm = new GameManager(GameConfig);
+    gm.completeQuestGoal('talk', 'npc1');
+    gm.player.level = 3;
+    gm.addItem({ id: 'sword_upgrade', name: 'Pierre à Aiguiser', qty: 1 });
+    localStorage.setItem('rpg_save_consent', 'true');
+    localStorage.setItem('rpg_save_v1', JSON.stringify({ player: gm.player, inventory: gm.inventory, quests: gm.quests }));
+    const loaded = new GameManager(GameConfig);
+    assert.ok(loaded.load());
+    assert.strictEqual(loaded.passage, 'cut');
+    assert.strictEqual(loaded.player.level, 3);
+    assert.strictEqual(loaded.quests.find(q => q.id === 'q1').status, 'completed');
+    assert.ok(loaded.openChests.includes('chest_house'));
+    const baseDamage = loaded.player.damage;
+    assert.ok(loaded.sharpenSword());
+    assert.strictEqual(loaded.sharpenSword(), false);
+    assert.ok(loaded.load());
+    assert.strictEqual(loaded.player.damage, baseDamage + 5);
+    assert.strictEqual(loaded.sharpened, true);
+});
+
+test("VILLAGE", "Le soin et le nombre de potions sont sauvegardés ensemble", () => {
+    localStorage.setItem('rpg_save_consent', 'true');
+    const gm = new GameManager(GameConfig);
+    gm.player.hp = 31;
+    gm.addItem({ id: 'potion', name: 'Potion de soin', qty: 2 });
+    gm.useItem('potion');
+    const loaded = new GameManager(GameConfig);
+    assert.ok(loaded.load());
+    assert.strictEqual(loaded.player.hp, 61);
+    assert.strictEqual(loaded.inventory[0].qty, 1);
+});
+
+
 // ==========================================
 // TEST SUMMARY & REPORTING
 // ==========================================

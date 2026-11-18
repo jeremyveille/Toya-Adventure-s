@@ -37,3 +37,29 @@ Sources : [manuel Nintendo](https://www.nintendo.com/eu/media/downloads/games_8/
 5. Parcourir le village de l'apparition au retour au guide, puis recharger une partie et revisiter la maison.
 6. Vérifier la lecture des PV, du contexte, des dialogues et des menus en jouant au clavier.
 7. Relancer les tests de régression et consigner le périmètre vérifié.
+
+## Réglages de cette version
+
+Les valeurs ci-dessous sont des choix de conception de Toya, en pixels du monde Phaser et en millisecondes. Le manuel de référence ne fournit pas de données temporelles mesurées. Le ressenti au clavier se juge en particulier sur un demi-tour et une esquive au bout du pont.
+
+| Paramètre ajustable dans `src/data/config.js` | Valeur initiale | Effet en jeu |
+|---|---:|---|
+| Marche / course | 176 / 272 px/s | Traverser une case de 64 px prend environ 0,36 / 0,24 s à vitesse établie (calcul). |
+| Accélération / frein | 1 850 / 2 400 px/s² | Depuis le repos, environ 95 ms pour atteindre la marche. Environ 73 ms pour s’arrêter depuis cette allure (calcul continu). |
+| Marche à vitesse nominale | 8 images/s | La cadence suit le déplacement observé des pieds. À l'arrêt, les poses regardent dans quatre directions. |
+| Épée | 70 ms de préparation, 100 ms de frappe, 145 ms de reprise | Le manche apparaît d'abord. La lame s'étend pendant les dégâts. L'action complète dure 315 ms. |
+| Zone d'attaque | 44 px vers l'avant, 34 px de large | Les empreintes des cibles entrent en compte. Une même cible reçoit un seul coup par balayage. |
+| Gardien | Alerte à 62 px, annonce de 480 ms, charge de 205 ms, repos de 620 ms | Les trois marques ambrées fixent sa direction. Prendre un pas de côté puis contre-attaquer. |
+| Impact | 12 PV, immunité du joueur de 680 ms, recul ennemi de 110 ms | La charge traversante peut blesser une fois. L'ennemi récupère après un coup reçu. |
+
+## Bilan par phase
+
+1. **Audit.** Inspection des sept PNG et des scripts. Les poses sources, les cartes Village / House1, la fabrication, les quêtes et le stockage local restent la base.
+2. **Mouvement.** Douze poses recentrées, deux allures, déplacement diagonal normalisé, frein et collision aux pieds. Le regard reste stable lors d'une diagonale.
+3. **Combat.** Quatre orientations, trois phases de frappe, zone active synchronisée, impact et recul bornés. La sentinelle du pont poursuit sur une courte distance, annonce sa charge puis récupère.
+4. **Décor.** Saule extrait de la ressource du dépôt, ombres de contact, plate-forme de pierre et marches praticables, tablier continu, garde-corps triés par segment et rides d'eau animées. Le terrain fixe est mis en texture une fois par carte.
+5. **Village.** Le guide enseigne la première coupe. La ronce occupe toute la passe. La rive sud déclenche la rencontre, puis le coffre de la terrasse donne la navette et les potions. Rapporter la navette achève la quête. Une reprise replace Toya sur une rive adaptée à l’étape enregistrée.
+6. **Interface.** Vie et conseil bref dans le HUD, action contextuelle au-dessus du joueur, notification d'objet et dialogue. Le sac présente l'épée équipée et permet d'appliquer la pierre de la maison.
+7. **Vérification.** `npm test` a été exécuté après chaque phase technique. La suite finale contient 5 tests historiques et 57 contrôles complémentaires. Le parcours `tests/play_village.py` pilote le clavier dans Chromium avec Phaser 3.55.2 et Arcade Physics. Il couvre la ronce solide, la traversée, la frappe, le coffre, le rechargement, le retour au guide, les deux portes et les menus. Une vérification séparée a laissé le gardien toucher puis vaincre Toya et contrôlé la reprise au point de passage. Des contrôles ciblés ont aussi vérifié le blocage de l'eau et du garde-corps ainsi que le tri et l'occlusion de l'arbre et du toit, devant et derrière le joueur.
+
+La compatibilité des anciennes parties conserve inventaire, statistiques et quêtes. Une conversation du guide déjà terminée reprend à la coupe. Les anciens fichiers ne contiennent pas l'historique exhaustif des coffres ouverts. La pierre présente dans le sac permet de reconnaître le coffre de la maison.

@@ -115,15 +115,13 @@ class GameManager {
     speakToGuide(npc) {
         if (this.passage === 'meet') {
             this.passage = 'cut';
-            this.completeQuestGoal('talk', npc.id);
-            this.save();
+            if (!this.completeQuestGoal('talk', npc.id)) this.save();
             return npc.dialogue;
         }
         if (this.passage === 'return' && this.inventory.some(i => i.id === 'navette' && i.qty > 0)) {
             this.passage = 'done';
             this.removeItem('navette', 1, false);
-            this.completeQuestGoal('deliver', 'navette');
-            this.save();
+            if (!this.completeQuestGoal('deliver', 'navette')) this.save();
             return 'Ma navette ! Je peux enfin retisser les cordages du pont. Merci, Toya.';
         }
         return this.passage === 'done' ? 'Écoute le bois du pont. Il chante de nouveau.'

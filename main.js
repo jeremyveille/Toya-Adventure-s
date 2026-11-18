@@ -19,6 +19,6 @@ const config = {
 };
 
 // Tentative de chargement de sauvegarde
-window.gameState.load();
+if (localStorage.getItem('rpg_save_consent') === 'true') window.gameState.load();
 
 const game = new Phaser.Game(config);
