@@ -64,7 +64,7 @@ class WorldScene extends Phaser.Scene {
 
     preload() {
         this.load.spritesheet('toya', 'assets/village/toya-walk.png', { frameWidth: 32, frameHeight: 48 });
-        this.load.image('enemy', 'assets/enemy.png');
+        this.load.image('gardien', 'assets/village/gardien.png');
     }
 
     create() {
@@ -510,7 +510,7 @@ class WorldScene extends Phaser.Scene {
     }
 
     createEnemy(cx, cy, type) {
-        let enemy = new Enemy(this, cx, cy, 'enemy', type);
+        let enemy = new Enemy(this, cx, cy, 'gardien', type);
         let shadow = this.add.sprite(cx, cy, 'tex_shadow');
         shadow.setScale(1.6, 1.0);
         shadow.setDepth(Math.floor(cy) - 0.5);
@@ -1050,11 +1050,20 @@ class WorldScene extends Phaser.Scene {
     }
 
     hitMinorEnemy(weaponBox, enemy) {
-        if (!enemy.isFlashing) {
+        if (!enemy.isFlashing && !this.player.hitTargets.has(enemy)) {
+            this.player.hitTargets.add(enemy);
             let dmg = window.gameState ? window.gameState.player.damage : 10;
             enemy.takeDamage(dmg);
-            this.cameras.main.shake(100, 0.005);
+            this.impact(weaponBox.x, weaponBox.y, 0xffdf86);
             if (window.audioManager) window.audioManager.play('hit');
+        }
+    }
+
+    impact(x, y, color) {
+        for (const [dx, dy] of [[-8, -6], [7, -9], [-6, 5], [9, 3]]) {
+            const fleck = this.add.rectangle(x, y - 6, 4, 3, color).setDepth(Math.floor(y) + 25);
+            this.tweens.add({ targets: fleck, x: x + dx, y: y + dy - 6, alpha: 0,
+                duration: 140, onComplete: () => fleck.destroy() });
         }
     }
 

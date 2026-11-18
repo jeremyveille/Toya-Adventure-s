@@ -14,6 +14,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
         this.speed = GameConfig.movement.walkSpeed;
         this.isAttacking = false;
+        this.hitTargets = new Set();
+        this.hurtUntil = 0;
         this.lastX = x;
         this.lastY = y;
 
@@ -31,7 +33,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         scene.physics.add.existing(this.interactionHitbox);
 
         // Création de l'arme (Zone de dégat invisible)
-        this.weaponHitbox = scene.add.zone(0, 0, 80, 80);
+        this.weaponHitbox = scene.add.zone(0, 0, 1, 1);
         scene.physics.add.existing(this.weaponHitbox);
         this.weaponHitbox.body.setEnable(false); // Désactivée par défaut
 
@@ -55,6 +57,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.lastX = this.x;
         this.lastY = this.y;
         this.setDepth(Math.floor(this.y));
+        if (this.isAttacking && this.active) this.updateAttack(delta);
         if (!this.active || this.isAttacking) {
             this.setVelocity(0);
             return;
@@ -93,51 +96,84 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.interactionHitbox.x = this.x + (this.facing === 'right' ? offset : this.facing === 'left' ? -offset : 0);
         this.interactionHitbox.y = this.y - 8 + (this.facing === 'down' ? offset : this.facing === 'up' ? -offset : 0);
 
+        this.interactionHitbox.body.updateFromGameObject();
         if (Phaser.Input.Keyboard.JustDown(this.spaceBar)) this.performActionAttack();
     }
 
     performActionAttack() {
+        if (!this.active || this.isAttacking) return;
         this.isAttacking = true;
-        
-        // On positionne la hitbox devant le joueur selon sa direction
-        const offset = 40;
-        this.weaponHitbox.x = this.x + (this.facing === 'right' ? offset : this.facing === 'left' ? -offset : 0);
-        this.weaponHitbox.y = (this.y - 12) + (this.facing === 'down' ? offset : this.facing === 'up' ? -offset : 0);
-        
-        this.weaponHitbox.body.setEnable(true);
+        this.attackTime = 0;
+        this.hitTargets.clear();
+        this.setVelocity(0);
+        this.anims.stop();
+        this.attackRow = { down: 0, left: 3, right: 6, up: 9 }[this.facing];
+        this.setFrame(this.attackRow);
+        this.slash = this.scene.add.graphics();
+        this.slash.setDepth(this.depth + (this.facing === 'up' ? -0.1 : 1));
+        this.updateAttack(0);
+    }
 
-        // Effet visuel d'épée (Arc graphique)
-        let slash = this.scene.add.graphics();
-        slash.lineStyle(4, 0xffffff); // Bordure blanche
-        slash.fillStyle(0x00ffff, 0.8); // Remplissage cyan
-        slash.beginPath();
-        slash.arc(0, 0, 40, Phaser.Math.DegToRad(-45), Phaser.Math.DegToRad(45), false);
-        slash.lineTo(0, 0);
-        slash.fillPath();
-        slash.strokePath();
+    updateAttack(delta) {
+        const c = GameConfig.combat;
+        this.attackTime += Math.min(delta, 50);
+        const t = this.attackTime;
+        const end = c.windupMs + c.strikeMs;
+        const active = t >= c.windupMs && t < end;
+        if (t >= end + c.recoverMs) {
+            this.weaponHitbox.body.setEnable(false);
+            this.slash.destroy();
+            this.isAttacking = false;
+            return;
+        }
 
-        slash.setPosition(this.weaponHitbox.x, this.weaponHitbox.y);
-        slash.setDepth(this.depth + 1);
-        
-        // Orientation de base selon la direction
-        let baseRotation = 0;
-        if (this.facing === 'left') baseRotation = 180;
-        if (this.facing === 'up') baseRotation = -90;
-        if (this.facing === 'down') baseRotation = 90;
-        slash.rotation = Phaser.Math.DegToRad(baseRotation - 45); // Démarre un peu en arrière
-        
-        this.scene.tweens.add({
-            targets: slash,
-            alpha: { from: 1, to: 0 },
-            scale: { from: 0.8, to: 1.5 },
-            rotation: Phaser.Math.DegToRad(baseRotation + 45), // Balayage vers l'avant
-            duration: 150,
-            ease: 'Cubic.easeOut',
-            onComplete: () => {
-                slash.destroy();
-                this.isAttacking = false;
-                this.weaponHitbox.body.setEnable(false); // Désactive la hitbox
+        const [dx, dy] = { down: [0, 1], up: [0, -1], right: [1, 0], left: [-1, 0] }[this.facing];
+        if (active && !this.weaponHitbox.body.enable) {
+            const length = c.reach - 4;
+            const half = c.reach - length / 2;
+            this.weaponHitbox.setSize(dx ? length : c.width, dy ? length : c.width);
+            this.weaponHitbox.body.setSize(this.weaponHitbox.width, this.weaponHitbox.height, false);
+            this.weaponHitbox.body.reset(this.x + dx * half, this.y - 5 + dy * half);
+            this.setFrame(this.attackRow + 2);
+        }
+        this.weaponHitbox.body.setEnable(active);
+        const swing = Phaser.Math.Clamp((t - c.windupMs) / c.strikeMs, 0, 1);
+        const sweep = (swing - 0.5) * 1.35;
+        const angle = Math.atan2(dy, dx) + sweep;
+        const blade = this.slash;
+        blade.clear();
+        if (t >= end) {
+            this.setFrame(this.attackRow + 1);
+            return;
+        }
+        // Une lame en pixels entiers, une poignée en laiton et un fil clair.
+        const radius = active ? c.reach : c.reach * 0.55;
+        for (let r = 7; r <= radius; r += 2) {
+            const x = Math.round(this.x + Math.cos(angle) * r);
+            const y = Math.round(this.y - 10 + Math.sin(angle) * r);
+            blade.fillStyle(r < 14 ? 0x63432d : r < 18 ? 0xe5ae55 : 0x5e7581);
+            blade.fillRect(x - 2, y - 2, 5, 5);
+            if (r >= 18) {
+                blade.fillStyle(0xfff2ce);
+                blade.fillRect(x - 2, y - 2, 3, 3);
             }
+        }
+    }
+
+    takeHit(damage) {
+        const now = this.scene.time.now;
+        if (!this.active || now < this.hurtUntil || this.scene.transitioning) return false;
+        this.hurtUntil = now + GameConfig.combat.hurtMs;
+        const stats = window.gameState.player;
+        stats.hp = Math.max(0, stats.hp - damage);
+        this.setTint(0xffb093);
+        this.scene.tweens.add({
+            targets: this, alpha: 0.5, yoyo: true, repeat: 3,
+            duration: GameConfig.combat.hurtMs / 8,
+            onComplete: () => { this.clearTint(); this.setAlpha(1); }
         });
+        this.scene.events.emit('Notice', '−' + damage + ' PV');
+        window.audioManager.play('hit');
+        return true;
     }
 }

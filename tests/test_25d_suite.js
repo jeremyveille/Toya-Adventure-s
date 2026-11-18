@@ -85,6 +85,7 @@ global.Phaser = {
         }
     },
     Math: {
+        Clamp: (n, min, max) => Math.min(max, Math.max(min, n)),
         Between: (a, b) => a,
         DegToRad: (deg) => deg * Math.PI / 180,
         Vector2: class {
@@ -115,7 +116,7 @@ function createMockScene() {
             existing: () => {},
             zone: (x, y, w, h) => ({
                 x, y, width: w, height: h,
-                body: { setEnable: () => {} }
+                body: { setEnable: () => {}, updateFromGameObject: () => {} }
             }),
             graphics: () => ({
                 lineStyle: () => {}, fillStyle: () => {}, beginPath: () => {},
@@ -686,6 +687,9 @@ test("T3-CROSS", "Player dialogue guard (active=false) freezes movement velocity
 test("T3-CROSS", "Player sword attack (isAttacking=true) locks movement", () => {
     const scene = createMockScene();
     const player = new Player(scene, 100, 100, 'hero');
+    player.attackTime = 200; // Reprise du coup, après la fenêtre active.
+    player.slash = { clear() {} };
+    player.attackRow = 6;
     player.isAttacking = true;
     player.cursors.right.isDown = true;
     player.update();
