@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RPG - L'Éveil</title>
+    <title>Toya Adventure's · Le passage des Saules</title>
     <meta name="description" content="Un jeu RPG 2D dans le navigateur.">
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js" crossorigin="anonymous"></script>
     <style>
@@ -33,7 +33,7 @@
             align-items: center;
             min-height: 100vh;
             color: var(--text-color);
-            font-family: 'Press Start 2P', cursive;
+            font-family: 'Press Start 2P', monospace;
         }
 
         h1 {
@@ -62,28 +62,6 @@
 
         #game-container {
             position: relative;
-        }
-
-        /* Scanlines effet CRT */
-        #game-container::after {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
-            background: linear-gradient(
-                to bottom,
-                rgba(255, 255, 255, 0),
-                rgba(255, 255, 255, 0) 50%,
-                rgba(0, 0, 0, 0.15) 50%,
-                rgba(0, 0, 0, 0.15)
-            );
-            background-size: 100% 4px;
-            z-index: 10;
-            pointer-events: none;
-            border-radius: 8px;
         }
 
         .controls-panel {
@@ -119,7 +97,7 @@
         kbd {
             display: inline-block;
             padding: 4px 8px;
-            font-family: 'Press Start 2P', cursive;
+            font-family: 'Press Start 2P', monospace;
             font-size: 10px;
             color: #d4af37;
             background-color: #0c151c;
@@ -137,7 +115,7 @@
         }
 
         button {
-            font-family: 'Press Start 2P', cursive;
+            font-family: 'Press Start 2P', monospace;
             font-size: 10px;
             background-color: var(--btn-bg);
             color: #fff;
@@ -252,7 +230,7 @@
 
     <div id="rgpd-dialog" role="dialog" aria-labelledby="rgpd-title" aria-describedby="rgpd-desc" aria-hidden="true" aria-modal="true" tabindex="-1">
         <span id="rgpd-title" class="rgpd-header">Paramètres de confidentialité</span>
-        <p id="rgpd-desc">Ce jeu utilise le stockage local de votre navigateur (`localStorage`) **exclusivement** pour sauvegarder votre progression en local (inventaire, niveau, quêtes). Aucune donnée personnelle (nom, email, IP) n'est collectée, analysée, ni partagée avec des tiers. Autorisez-vous la sauvegarde de votre progression ?</p>
+        <p id="rgpd-desc">Souhaites-tu retrouver ta progression sur ce navigateur ? Ta partie, tes objets et tes quêtes seront enregistrés sur cet appareil.</p>
         <p style="font-size: 11px; margin-top: 5px; color: #aaa;">Vous pouvez révoquer ce consentement à tout moment via les boutons en bas de page.</p>
         <div class="rgpd-actions">
             <button id="btn-decline-save" class="danger" aria-label="Refuser la sauvegarde locale">Refuser</button>
@@ -261,7 +239,7 @@
     </div>
 
     <main>
-        <h1>🌿 RPG - L'éveil 🌿</h1>
+        <h1>Toya Adventure’s</h1>
         
         <div id="game-container" aria-label="Zone de jeu interactive" role="application">
             <!-- Phaser injects canvas here -->
@@ -269,20 +247,10 @@
         
         <section class="controls-panel" aria-labelledby="controls-title">
             <h2 id="controls-title" class="sr-only">Commandes du jeu et options</h2>
-            <div class="controls" aria-hidden="true">
-                <div>
-                    <span>Déplacement :</span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd>
-                    <span style="margin-left: 15px;">Attaque :</span><kbd>Espace</kbd>
-                    <span style="margin-left: 15px;">Interagir :</span><kbd>E</kbd>
-                </div>
-                <div style="margin-top: 10px;">
-                    <span>Menu :</span><kbd>I</kbd>
-                    <span style="margin-left: 15px;">Inventaire :</span><kbd>J</kbd>
-                    <span style="margin-left: 15px;">Quêtes :</span><kbd>C</kbd>
-                    <span style="margin-left: 15px;">Crafting :</span><kbd>K</kbd>
-                </div>
+            <div class="controls">
+                <div><kbd>ZQSD</kbd> ou <kbd>Flèches</kbd> Marcher · <kbd>Maj</kbd> Courir · <kbd>Espace</kbd> Épée · <kbd>E</kbd> Interagir</div>
+                <div style="margin-top: 10px"><kbd>I</kbd> Inventaire et équipement · <kbd>J</kbd> Quêtes · <kbd>C</kbd> Atelier</div>
             </div>
-            
             <div class="footer-actions">
                 <button id="btn-manage-data" class="secondary" aria-haspopup="dialog">Gérer mes données (RGPD)</button>
                 <button id="btn-delete-save" class="danger">Effacer ma sauvegarde</button>
@@ -326,7 +294,11 @@
         let previouslyFocusedElement = null;
 
         function showRgpdDialog() {
+            window.privacyDialogOpen = true;
             previouslyFocusedElement = document.activeElement;
+            if (game.scene.isActive('WorldScene')) game.scene.pause('WorldScene');
+            const world = game.scene.keys.WorldScene;
+            if (world?.player) world.player.setVelocity(0);
             rgpdDialog.style.display = 'flex';
             rgpdDialog.setAttribute('aria-hidden', 'false');
             rgpdDialog.focus();
@@ -334,6 +306,9 @@
         }
 
         function hideRgpdDialog() {
+            window.privacyDialogOpen = false;
+            const hud = game.scene.keys.HUDScene;
+            if (!hud?.isMenuActive && !hud?.isDialogueActive && game.scene.isPaused('WorldScene')) game.scene.resume('WorldScene');
             rgpdDialog.style.display = 'none';
             rgpdDialog.setAttribute('aria-hidden', 'true');
             if (previouslyFocusedElement) previouslyFocusedElement.focus();
@@ -352,6 +327,7 @@
 
         btnDecline.addEventListener('click', () => {
             localStorage.setItem('rpg_save_consent', 'false');
+            localStorage.removeItem('rpg_save_v1');
             hideRgpdDialog();
             window.announce("Sauvegarde locale refusée. Les données ne seront pas conservées après la fermeture.");
         });
@@ -365,7 +341,7 @@
                 localStorage.removeItem('rpg_save_v1');
                 alert("Sauvegarde effacée.");
                 window.announce("La sauvegarde a été effacée avec succès.");
-                if (window.gameState) window.gameState.reset();
+                window.location.reload();
             }
         });
     </script>

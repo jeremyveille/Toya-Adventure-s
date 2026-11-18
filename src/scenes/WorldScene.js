@@ -886,7 +886,7 @@ class WorldScene extends Phaser.Scene {
     }
 
     update(time, delta) {
-        if (this.transitioning) return;
+        if (this.transitioning || window.privacyDialogOpen) return;
         if (window.gameState.player.hp <= 0) {
             if (!this.isDead) {
                 this.isDead = true;

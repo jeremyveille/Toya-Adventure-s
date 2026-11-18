@@ -97,7 +97,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.interactionHitbox.y = this.y - 8 + (this.facing === 'down' ? offset : this.facing === 'up' ? -offset : 0);
 
         this.interactionHitbox.body.updateFromGameObject();
-        if (Phaser.Input.Keyboard.JustDown(this.spaceBar)) this.performActionAttack();
+        const attackPressed = Phaser.Input.Keyboard.JustDown(this.spaceBar);
+        if (this.waitForSpaceRelease) {
+            if (!this.spaceBar.isDown) this.waitForSpaceRelease = false;
+        } else if (attackPressed) this.performActionAttack();
     }
 
     performActionAttack() {
