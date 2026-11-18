@@ -28,6 +28,18 @@ La référence est le manuel français illustré de Nintendo (pages imprimées 1
 
 Sources : [manuel Nintendo](https://www.nintendo.com/eu/media/downloads/games_8/emanuals/nintendo_ds_21/Manual_NintendoDS_TheLegendOfZeldaPhantomHourglass_FR.pdf), [île Melka](https://www.zeldadungeon.net/phantom-hourglass-walkthrough/mercay-island/), [Temple du Feu](https://www.zeldadungeon.net/phantom-hourglass-walkthrough/temple-of-fire/), [démarche REA](https://github.com/morluto/rea), [vidéo proposée à 6 min 18](https://www.youtube.com/watch?v=6MpHBHw30OE&t=378s).
 
+## Repères visuels dans la partie de RetroArchive
+
+La partie intégrale fournie par Jérémy montre la version DS avec des textes en anglais. Les temps ci-dessous correspondent à des images de l’aperçu YouTube, échantillonné toutes les dix secondes. Ils permettent de vérifier la composition de la scène et l’ordre des situations. La vitesse d’un demi-tour, les images actives d’une frappe et le temps de récupération restent à mesurer sur un extrait continu.
+
+| Moment de la vidéo | Ce que montre l’image | Application au passage des Saules |
+|---|---|---|
+| [12 min 30 · île Melka](https://youtu.be/aPgtEFwJc9Y?t=750) | Le chemin clair arrive au bord de l’eau. On voit simultanément Link, la rupture de la berge et les rochers du passage. | À l’approche de la ronce, vérifier que le joueur peut lire ensemble l’obstacle, l’eau et l’entrée du pont. |
+| [15 min 10 · obtention de l’épée](https://youtu.be/aPgtEFwJc9Y?t=910) et [16 min 20 · exercice](https://youtu.be/aPgtEFwJc9Y?t=980) | L’épée est présentée en gros plan. Sur l’image suivante retenue, le cadre s’élargit autour de Link, lame sortie, au milieu de poteaux espacés. | Toya porte déjà son épée. La ronce donne un but au premier coup et permet de le recommencer sans pression avant la rencontre sur l’autre rive. |
+| [48 min 20 · Temple du Feu](https://youtu.be/aPgtEFwJc9Y?t=2900) | Quatre dalles rouges sont groupées au bord de la lave. Le contour clair de la rive reste visible autour du motif. | Pour le gardien, vérifier que les marques de charge se distinguent de l’herbe et du chemin et que l’espace où esquiver reste visible. |
+
+Ces repères complètent les sources de l’audit initial. Les valeurs de mouvement et de combat de Toya demeurent des réglages propres au projet.
+
 ## Ordre de réalisation et contrôles
 
 1. Vérifier le point de départ, les silhouettes et les tests existants.
