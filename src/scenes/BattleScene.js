@@ -3,6 +3,12 @@ class BattleScene extends Phaser.Scene {
         super('BattleScene');
     }
 
+    preload() {
+        this.load.spritesheet('hero', 'assets/hero_spritesheet.png', { frameWidth: 341, frameHeight: 256 });
+        this.load.image('tiles', 'assets/tileset.png');
+        this.load.image('enemy', 'assets/enemy.png');
+    }
+
     create() {
         // Fond de combat, style Toriyama (désert/forêt simplifiée)
         this.add.image(0, 0, 'tiles').setOrigin(0,0).setScale(1.5).setTint(0x777777); // Assombrit

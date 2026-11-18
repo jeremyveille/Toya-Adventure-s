@@ -201,10 +201,10 @@ const mapsSource = fs.readFileSync(path.join(rootDir, 'src/maps/maps.js'), 'utf8
 const MapsData = new Function(mapsSource + '; return MapsData;')();
 
 const playerSource = fs.readFileSync(path.join(rootDir, 'src/classes/Player.js'), 'utf8');
-const Player = new Function(playerSource + '; return Player;')();
+const Player = new Function('GameConfig', playerSource + '; return Player;')(GameConfig);
 
 const enemySource = fs.readFileSync(path.join(rootDir, 'src/classes/Enemy.js'), 'utf8');
-const Enemy = new Function(enemySource + '; return Enemy;')();
+const Enemy = new Function('GameConfig', enemySource + '; return Enemy;')(GameConfig);
 
 // ==========================================
 // TEST RUNNER ENGINE
@@ -672,7 +672,9 @@ test("T3-CROSS", "Player dialogue guard (active=false) freezes movement velocity
     // When active, moves
     player.active = true;
     player.update();
-    assert.strictEqual(player.body.velocity.x, -player.speed, "Active player must move on keypress");
+    assert.ok(player.body.velocity.x < 0 && player.body.velocity.x > -player.speed, "First step accelerates toward walk speed");
+    for (let frame = 0; frame < 10; frame++) player.update(1000 / 60);
+    assert.strictEqual(player.body.velocity.x, -player.speed, "Held direction reaches walk speed");
 
     // When inactive (dialogue or cutscene), velocity must be strictly 0
     player.active = false;

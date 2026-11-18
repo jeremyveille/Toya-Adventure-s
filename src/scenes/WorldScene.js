@@ -63,7 +63,7 @@ class WorldScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.spritesheet('hero', 'assets/hero_spritesheet.png', { frameWidth: 341, frameHeight: 256 });
+        this.load.spritesheet('toya', 'assets/village/toya-walk.png', { frameWidth: 32, frameHeight: 48 });
         this.load.image('enemy', 'assets/enemy.png');
     }
 
@@ -314,7 +314,7 @@ class WorldScene extends Phaser.Scene {
             spawnX = this.spawnOverride.x * ts + ts/2;
             spawnY = this.spawnOverride.y * ts + ts/2;
         }
-        this.player = new Player(this, spawnX, spawnY, 'hero');
+        this.player = new Player(this, spawnX, spawnY, 'toya');
         this.player.setDepth(Math.floor(this.player.y));
         
         // Ombre portée sous les pieds du joueur
@@ -950,7 +950,7 @@ class WorldScene extends Phaser.Scene {
         }
     }
 
-    update() {
+    update(time, delta) {
         if (window.gameState.player.hp <= 0) {
             if (!this.isDead) {
                 this.isDead = true;
@@ -963,7 +963,7 @@ class WorldScene extends Phaser.Scene {
             return;
         }
 
-        this.player.update();
+        this.player.update(delta);
         
         // Synchronisation de l'ombre au sol du joueur (baseY - 0.5)
         if (this.playerShadow) {

@@ -3,6 +3,16 @@
  * Regroupe les données statiques (quêtes, recettes) pour séparer la logique métier des données.
  */
 const GameConfig = {
+    movement: {
+        walkSpeed: 176, runSpeed: 272, acceleration: 1850, braking: 2400,
+        walkFps: 8, interactionOffset: 32
+    },
+    combat: {
+        windupMs: 70, strikeMs: 100, recoverMs: 145, reach: 44, width: 34,
+        hurtMs: 680, knockbackMs: 110, knockbackSpeed: 125,
+        sight: 150, approachSpeed: 72, warningRange: 62, warningMs: 480,
+        lungeSpeed: 200, lungeMs: 205, restMs: 620, enemyDamage: 12
+    },
     initialPlayerState: {
         level: 1,
         xp: 0,
