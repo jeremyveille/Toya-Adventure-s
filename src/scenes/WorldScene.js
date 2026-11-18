@@ -60,6 +60,8 @@ class WorldScene extends Phaser.Scene {
         this.targetMapName = data.map || "Village";
         this.spawnOverride = data.spawn || null;
         this.isDead = false;
+        this.transitioning = false;
+        this.hasMoved = false;
     }
 
     preload() {
@@ -72,6 +74,8 @@ class WorldScene extends Phaser.Scene {
         this.currentMapData = MapsData[this.targetMapName];
         const ts = this.currentMapData.tileSize;
         
+        const passage = this.currentMapData.passage;
+        const state = window.gameState;
         const layout = this.currentMapData.layoutText;
         const height = layout.length;
         const width = layout[0].length;
@@ -256,10 +260,11 @@ class WorldScene extends Phaser.Scene {
                 } else if (cell === 'N') {
                     this.createNPC(cx, cy, ts, this.currentMapData.npcsData['N']);
                 } else if (cell === 'E') {
-                    this.createEnemy(cx, cy, 'minor');
+                    if (!passage || state.passage === 'fight') this.createEnemy(cx, cy, 'minor');
                 } else if (cell === 'b') {
                     // Correctif Bug M4 : 'b' minuscule pour buisson récoltable
-                    this.createResource(cx, cy, ts, 'bush');
+                    const gate = passage && passage.gate.x === x && passage.gate.y === y;
+                    if (!gate || ['meet', 'cut'].includes(state.passage)) this.createResource(cx, cy, ts, gate);
                 } else if (cell === 'o') {
                     this.createChest(cx, cy, ts, this.currentMapData.chestsData['o']);
                 } else if (cell === '>') {
@@ -293,6 +298,9 @@ class WorldScene extends Phaser.Scene {
         this.buildHouses(houseCells, ts);
 
         // --- JOUEUR (Ancrage 2.5D aux pieds) ---
+        if (!this.spawnOverride && passage && ['fight', 'open', 'return'].includes(state.passage)) {
+            this.spawnOverride = passage.landing;
+        }
         if (this.spawnOverride) {
             spawnX = this.spawnOverride.x * ts + ts/2;
             spawnY = this.spawnOverride.y * ts + ts/2;
@@ -342,12 +350,8 @@ class WorldScene extends Phaser.Scene {
         this.physics.add.overlap(this.player.weaponHitbox, this.resourceGroup, this.hitResource, null, this);
         this.physics.add.overlap(this.player, this.doorGroup, this.enterDoor, null, this);
 
-        this.input.keyboard.on('keydown-E', () => {
-            this.physics.overlap(this.player.interactionHitbox, this.interactiveZones, this.handleInteraction, null, this);
-        });
-
+        this.interactKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
         this.scene.launch('HUDScene');
-        if (this.targetMapName === "Village") this.setupTutorial();
     }
 
     createWall(cx, cy, width, height = width) {
@@ -496,22 +500,28 @@ class WorldScene extends Phaser.Scene {
         shadow.setDepth(Math.floor(cy) - 0.5);
         enemy.shadow = shadow;
         this.enemies.add(enemy);
+        if (this.currentMapData.passage) {
+            enemy.onDefeat = () => {
+                if (window.gameState.passage === 'fight') window.gameState.passage = 'open';
+            };
+        }
     }
 
-    createResource(cx, cy, ts, type) {
-        let zone = this.createWall(cx, cy + ts * 0.2, 28, 20);
+    createResource(cx, cy, ts, gate) {
+        let zone = this.createWall(cx, cy + ts * 0.2, gate ? ts : 28, 20);
         let sprite = this.add.sprite(cx, cy + ts * 0.2, 'tex_bush');
         sprite.setOrigin(0.5, 0.85);
         sprite.setDepth(Math.floor(cy + ts * 0.2));
         
-        zone.resData = { type };
+        if (gate) sprite.setDisplaySize(92, 70);
+        zone.isGate = gate;
         zone.sprite = sprite;
         this.resourceGroup.add(zone);
     }
 
     createChest(cx, cy, ts, data) {
         this.createWall(cx, cy + ts * 0.15, 32, 20);
-        let sprite = this.add.sprite(cx, cy + ts * 0.2, data.opened ? 'tex_chest_opened' : 'tex_chest_closed');
+        let sprite = this.add.sprite(cx, cy + ts * 0.2, window.gameState.openChests.includes(data.id) ? 'tex_chest_opened' : 'tex_chest_closed');
         sprite.setOrigin(0.5, 0.85);
         let baseDepth = Math.floor(cy + ts * 0.2);
         sprite.setDepth(baseDepth);
@@ -852,38 +862,44 @@ class WorldScene extends Phaser.Scene {
         gWall.generateTexture('tex_wall', ts, ts).destroy();
     }
 
-    handleInteraction(playerHitbox, interactiveZone) {
-        if(interactiveZone.npcData) {
-            let npc = interactiveZone.npcData;
-            this.events.emit('StartDialogue', npc.name, npc.dialogue, () => {});
-            if (window.gameState && window.gameState.completeQuestGoal) {
-                window.gameState.completeQuestGoal('talk', npc.id);
-            }
-        }
-        else if (interactiveZone.chestData) {
-            let chest = interactiveZone.chestData;
-            if(!chest.opened) {
-                chest.opened = true;
-                interactiveZone.sprite.setTexture('tex_chest_opened');
-                window.gameState.addItem(chest.item);
-                
-                let txt = this.add.text(this.player.x, this.player.y - 50, `Obtenu: ${chest.item.name} x${chest.item.qty}`, { fontSize: '12px', color: '#ffff00', fontFamily: '"Press Start 2P"', stroke: '#000', strokeThickness: 4 });
-                txt.setDepth(9002);
-                this.tweens.add({ targets: txt, y: txt.y - 50, alpha: 0, duration: 2000, onComplete: () => txt.destroy() });
-                if (window.audioManager) window.audioManager.play('collect');
+    handleInteraction(zone) {
+        const state = window.gameState;
+        if (zone.npcData) {
+            this.events.emit('StartDialogue', zone.npcData.name, state.speakToGuide(zone.npcData));
+        } else if (zone.chestData) {
+            const data = zone.chestData;
+            const passageChest = this.currentMapData.passage?.chestId === data.id;
+            if (state.openChest(data, passageChest)) {
+                zone.sprite.setTexture('tex_chest_opened');
+                this.events.emit('Notice', passageChest ? 'Navette du passeur · 3 potions' : data.item.name);
+                window.audioManager.play('collect');
+            } else if (!state.openChests.includes(data.id)) {
+                this.events.emit('Notice', 'Le gardien veille encore.');
             }
         }
     }
 
+    contextTarget() {
+        return this.interactiveZones.getChildren().find(zone =>
+            !window.gameState.openChests.includes(zone.chestData?.id) &&
+            this.physics.overlap(this.player.interactionHitbox, zone));
+    }
+
     update(time, delta) {
+        if (this.transitioning) return;
         if (window.gameState.player.hp <= 0) {
             if (!this.isDead) {
                 this.isDead = true;
                 this.player.setTint(0xff0000);
                 this.player.active = false;
                 this.player.setVelocity(0);
-                let txt = this.add.text(this.player.x, this.player.y - 20, "GAME OVER", { fontSize: '32px', fontFamily: '"Press Start 2P"', color: '#ff0000', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setDepth(10000);
-                this.time.delayedCall(3000, () => window.location.reload());
+                let txt = this.add.text(this.player.x, this.player.y - 20, "Retour au village…", { fontSize: '32px', fontFamily: '"Press Start 2P"', color: '#ff0000', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setDepth(10000);
+                this.time.delayedCall(1100, () => {
+                    window.gameState.player.hp = window.gameState.player.maxHp;
+                    window.gameState.save();
+                    this.scene.stop('HUDScene');
+                    this.scene.restart({ map: 'Village' });
+                });
             }
             return;
         }
@@ -913,65 +929,19 @@ class WorldScene extends Phaser.Scene {
             this.occlusionManager.update(this.player);
         }
 
-        if (this.targetMapName === "Village") {
-            this.updateTutorial();
+        if (!this.player.active || this.player.isAttacking) return;
+        if (this.player.body.velocity.length() > 0) this.hasMoved = true;
+        const target = this.contextTarget();
+        this.contextHint = target ? (target.npcData ? 'E · Parler' : 'E · Ouvrir') : '';
+        if (Phaser.Input.Keyboard.JustDown(this.interactKey) && target) this.handleInteraction(target);
+        const passage = this.currentMapData.passage;
+        if (passage && window.gameState.passage === 'cross' &&
+            this.player.y >= passage.landing.y * this.currentMapData.tileSize + 10) {
+            window.gameState.passage = 'fight';
+            window.gameState.save();
+            const ts = this.currentMapData.tileSize;
+            this.createEnemy((passage.guard.x + 0.5) * ts, (passage.guard.y + 0.5) * ts, 'minor');
         }
-    }
-
-    setupTutorial() {
-        this.tutorialTexts = [];
-        const ts = this.currentMapData.tileSize;
-        
-        const addTutorialText = (x, y, text) => {
-            let t = this.add.text(x * ts + ts/2, y * ts, text, {
-                fontSize: '10px',
-                fontFamily: '"Press Start 2P"',
-                color: '#ffffff',
-                backgroundColor: '#000000cc',
-                padding: { x: 8, y: 8 },
-                align: 'center',
-                stroke: '#000',
-                strokeThickness: 2
-            }).setOrigin(0.5).setAlpha(0);
-            t.setDepth(9002);
-            this.tutorialTexts.push({ obj: t, triggerX: x * ts + ts/2, triggerY: y * ts + ts/2, active: false, done: false, condition: null });
-            return t;
-        };
-
-        let t1 = addTutorialText(5, 4.5, "Déplace-toi avec\nZQSD ou Flèches");
-        this.tutorialTexts[0].condition = () => this.player.body.velocity.length() > 0;
-        this.tutorialTexts[0].active = true;
-        this.tutorialTexts[0].obj.setAlpha(1);
-
-        let t2 = addTutorialText(10, 8.5, "[E] Interagir");
-        this.tutorialTexts[1].triggerDist = 150;
-        this.tutorialTexts[1].condition = () => this.scene.get('HUDScene').isDialogueActive;
-
-        let t3 = addTutorialText(10, 13.5, "[Espace] Couper");
-        this.tutorialTexts[2].triggerDist = 150;
-        this.tutorialTexts[2].condition = () => this.player.isAttacking;
-
-        let t4 = addTutorialText(10, 19.5, "Combat!\n[Espace] Attaquer\n[1] Potion");
-        this.tutorialTexts[3].triggerDist = 250;
-        this.tutorialTexts[3].condition = () => window.gameState.player.hp < window.gameState.player.maxHp || this.enemies.countActive() === 0;
-    }
-
-    updateTutorial() {
-        if (!this.tutorialTexts) return;
-        this.tutorialTexts.forEach(step => {
-            if (step.done) return;
-            if (!step.active && step.triggerDist) {
-                let dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, step.triggerX, step.triggerY);
-                if (dist < step.triggerDist) {
-                    step.active = true;
-                    this.tweens.add({ targets: step.obj, alpha: 1, duration: 500 });
-                }
-            }
-            if (step.active && step.condition && step.condition()) {
-                step.done = true;
-                this.tweens.add({ targets: step.obj, alpha: 0, duration: 500 });
-            }
-        });
     }
 
     hitMinorEnemy(weaponBox, enemy) {
@@ -994,9 +964,17 @@ class WorldScene extends Phaser.Scene {
 
     hitResource(weaponBox, resZone) {
         if (resZone.isDestroyed) return;
+        if (resZone.isGate) {
+            if (window.gameState.passage !== 'cut') {
+                if (!this.player.hitTargets.has(resZone)) this.events.emit('Notice', 'Parle au guide près du panneau.');
+                this.player.hitTargets.add(resZone);
+                return;
+            }
+            window.gameState.passage = 'cross';
+        }
         resZone.isDestroyed = true;
         
-        this.cameras.main.shake(50, 0.005);
+        this.events.emit('Notice', '+1 bois');
         
         for(let i=0; i<6; i++) {
             let p = this.add.rectangle(resZone.x, resZone.y, 8, 8, 0x4caf50);
@@ -1020,6 +998,9 @@ class WorldScene extends Phaser.Scene {
     }
 
     enterDoor(player, doorZone) {
+        if (!player.active || this.isDead || this.transitioning) return;
+        this.transitioning = true;
+        player.setVelocity(0);
         let door = doorZone.doorData;
         this.scene.stop('HUDScene');
         this.cameras.main.fadeOut(300, 0, 0, 0);

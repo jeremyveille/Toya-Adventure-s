@@ -416,7 +416,7 @@ test("T1-FEAT", "Village spawn symbol 'S' is uniquely defined", () => {
         }
     });
     assert.strictEqual(spawnCount, 1, "Exactly one spawn point 'S' must exist in Village");
-    assert.deepStrictEqual(spawnCoords, { x: 5, y: 3 }, "Village spawn must be located at col 5, row 3");
+    assert.deepStrictEqual(spawnCoords, { x: 24, y: 11 }, "Village spawn overlooks the guide and bridge approach");
 });
 
 test("T1-FEAT", "NPC and Chest definitions in maps data", () => {
@@ -794,12 +794,14 @@ test("T4-SCENARIO", "Tutorial Step 1: Movement detection and tutorial condition"
 test("T4-SCENARIO", "Tutorial Step 2: Guide NPC proximity and dialogue quest trigger", () => {
     const gm = new GameManager(GameConfig);
     const ts = 64;
-    // Spawn at (5, 3) -> Guide at (10, 7)
-    const playerPos = { x: 5 * ts + 32, y: 3 * ts + 32 };
-    const guidePos = { x: 10 * ts + 32, y: 7 * ts + 32 };
-
+    const layout = MapsData.Village.layoutText;
+    const centerOf = symbol => {
+        const row = layout.findIndex(line => line.includes(symbol));
+        return { x: (layout[row].indexOf(symbol) + 0.5) * ts, y: (row + 0.5) * ts };
+    };
+    const playerPos = centerOf('S'), guidePos = centerOf('N');
     const initialDist = Phaser.Math.Distance.Between(playerPos.x, playerPos.y, guidePos.x, guidePos.y);
-    assert.ok(initialDist > 150, "Player starts outside guide trigger radius");
+    assert.ok(initialDist > 64 && initialDist <= 160, "Guide is visible but not already in interaction range");
 
     // Move player close to guide
     playerPos.x = guidePos.x + 30;

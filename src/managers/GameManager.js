@@ -44,6 +44,9 @@ class GameManager {
         this.player = JSON.parse(JSON.stringify(this.config.initialPlayerState || {}));
         /** @type {InventoryItem[]} */
         this.inventory = [];
+        this.passage = "meet";
+        this.openChests = [];
+        this.sharpened = false;
         /** @type {Quest[]} */
         this.quests = JSON.parse(JSON.stringify(this.config.initialQuests || []));
     }
@@ -60,6 +63,9 @@ class GameManager {
         const data = {
             player: this.player,
             inventory: this.inventory,
+            passage: this.passage,
+            openChests: this.openChests,
+            sharpened: this.sharpened,
             quests: this.quests
         };
         try {
@@ -86,9 +92,16 @@ class GameManager {
                 // Validation très basique pour des raisons de sécurité / RGPD (minimisation des données)
                 // On s'assure que les types attendus sont présents.
                 if (data && typeof data === 'object') {
-                    if (data.player && typeof data.player.hp === 'number') this.player = data.player;
+                    if (data.player && typeof data.player.hp === 'number') this.player = { ...this.player, ...data.player };
                     if (Array.isArray(data.inventory)) this.inventory = data.inventory;
                     if (Array.isArray(data.quests)) this.quests = data.quests;
+                    const metGuide = this.quests.some(q => q.id === 'q1' && q.status === 'completed');
+                    this.passage = Object.hasOwn(this.config.passageHints || {}, data.passage)
+                        ? data.passage : (metGuide ? 'cut' : 'meet');
+                    this.openChests = Array.isArray(data.openChests) ? [...new Set(data.openChests)] : [];
+                    if (!data.openChests && this.inventory.some(i => i.id === 'sword_upgrade')) this.openChests.push('chest_house');
+                    this.sharpened = data.sharpened === true;
+                    if (this.player.hp <= 0) this.player.hp = this.player.maxHp;
                     console.log("Partie chargée !");
                     return true;
                 }
@@ -99,11 +112,49 @@ class GameManager {
         return false;
     }
 
+    speakToGuide(npc) {
+        if (this.passage === 'meet') {
+            this.passage = 'cut';
+            this.completeQuestGoal('talk', npc.id);
+            this.save();
+            return npc.dialogue;
+        }
+        if (this.passage === 'return' && this.inventory.some(i => i.id === 'navette' && i.qty > 0)) {
+            this.passage = 'done';
+            this.removeItem('navette', 1, false);
+            this.completeQuestGoal('deliver', 'navette');
+            this.save();
+            return 'Ma navette ! Je peux enfin retisser les cordages du pont. Merci, Toya.';
+        }
+        return this.passage === 'done' ? 'Écoute le bois du pont. Il chante de nouveau.'
+            : this.config.passageHints[this.passage];
+    }
+
+    openChest(data, passageChest) {
+        if (this.openChests.includes(data.id) || (passageChest && this.passage !== 'open')) return false;
+        this.openChests.push(data.id);
+        if (passageChest) {
+            this.passage = 'return';
+            this.quests.push({ ...this.config.passageQuest });
+            this.addItem({ id: 'navette', name: 'Navette du passeur', qty: 1 }, false);
+        }
+        this.addItem(data.item);
+        return true;
+    }
+
+    sharpenSword() {
+        if (this.sharpened || !this.removeItem('sword_upgrade', 1, false)) return false;
+        this.sharpened = true;
+        this.player.damage += 5;
+        this.save();
+        return true;
+    }
+
     /**
      * Adds an item to the inventory
      * @param {InventoryItem} item 
      */
-    addItem(item) {
+    addItem(item, persist = true) {
         if (!item || typeof item.id !== 'string') return;
         
         let existing = this.inventory.find(i => i.id === item.id);
@@ -112,7 +163,7 @@ class GameManager {
         } else {
             this.inventory.push({...item}); // Shallow copy to avoid reference mutation
         }
-        this.save();
+        if (persist) this.save();
     }
 
     /**
@@ -121,14 +172,14 @@ class GameManager {
      * @param {number} qty 
      * @returns {boolean} True if successfully removed
      */
-    removeItem(itemId, qty = 1) {
+    removeItem(itemId, qty = 1, persist = true) {
         let existing = this.inventory.find(i => i.id === itemId);
         if(existing && existing.qty >= qty) {
             existing.qty -= qty;
             if(existing.qty <= 0) {
                 this.inventory = this.inventory.filter(i => i.id !== itemId);
             }
-            this.save();
+            if (persist) this.save();
             return true;
         }
         return false;
@@ -202,13 +253,10 @@ class GameManager {
      * @returns {boolean} True if used successfully
      */
     useItem(itemId) {
-        if (this.removeItem(itemId, 1)) {
-            if (itemId === 'potion') {
-                this.player.hp = Math.min(this.player.maxHp, this.player.hp + 30);
-                return true;
-            }
-        }
-        return false;
+        if (itemId !== 'potion' || !this.removeItem(itemId, 1, false)) return false;
+        this.player.hp = Math.min(this.player.maxHp, this.player.hp + 30);
+        this.save();
+        return true;
     }
 }
 
