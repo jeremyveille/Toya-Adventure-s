@@ -11,7 +11,8 @@ Un action-RPG en pixel-art trois quarts pour navigateur, développé avec Phaser
 ## Tests
 
 Les tests Node couvrent l’état de partie, les cartes, le déplacement et les fenêtres de frappe.
-- **Lancer les tests** : `npm test`
+- **Lancer les tests** : `npm test` (67 succès : 5 tests d’état + 62 contrôles 2.5D)
+- **Parcours navigateur** : `npm run test:e2e` (Python + Playwright, navigateur Chromium/Edge/Chrome)
 
 Ces tests valident :
 - L'initialisation du joueur.
@@ -20,6 +21,7 @@ Ces tests valident :
 - Le système de craft.
 - L'utilisation des objets.
 - La validation des quêtes.
+- La persistance des coffres et des ronces coupées, avec la version 2 de la sauvegarde.
 
 ## Conformité et Qualité
 
@@ -61,8 +63,9 @@ Ces tests valident :
 - `src/data/config.js` regroupe les vitesses, le frein, la portée et le rythme des attaques, les recettes et les consignes du passage.
 - `src/maps/maps.js` définit le village de 40 × 25 cases, la maison, la ronce, le débarcadère, la sentinelle et les marches de la terrasse.
 - `assets/village/` contient les poses du héros, le gardien et le saule au fond transparent, adaptés des images du dépôt.
+- `assets/ui/toya-portrait.png` est le portrait de dialogue (96 × 96, fond détouré). `scripts/pixelate_asset.py` le redimensionne et le quantifie depuis une image générée.
 - Le journal s’ouvre avec **J**. Dans le sac (**I**), **1** boit une potion et **2** affûte l’épée après avoir trouvé la pierre. **Échap** ferme les menus.
 
-Le scénario de régression navigateur utilise une installation facultative de Playwright pour Python avec Chromium. Avec le jeu lancé par `npm start`, exécuter `python tests/play_village.py`. Le test ouvre une partie de test isolée et pilote les touches jusqu'au retour de la maison. Le jeu lui-même et `npm test` ne nécessitent pas Playwright.
+Le scénario de régression navigateur utilise Playwright pour Python. `npm run test:e2e` sert le dépôt, détecte Edge ou Chrome (ou `CHROMIUM_PATH`) puis exécute `tests/play_village.py`. Sans serveur automatique, lancer `npm start` puis `python tests/play_village.py http://localhost:3000`. Le test ouvre une partie de test isolée et pilote les touches jusqu'au retour de la maison. Le jeu lui-même et `npm test` ne nécessitent pas Playwright.
 
 Le diagnostic, les sources et les réglages sont détaillés dans [GAME_FEEL_REFERENCE.md](GAME_FEEL_REFERENCE.md).

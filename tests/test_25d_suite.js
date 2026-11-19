@@ -272,6 +272,61 @@ test("T1-FEAT", "GameManager reset restores initial defaults", () => {
     assert.strictEqual(gm.inventory.length, 0, "Inventory must reset to empty");
 });
 
+test("T1-FEAT", "GameManager exposes save version 2 and no cut bush initially", () => {
+    const gm = new GameManager(GameConfig);
+    assert.strictEqual(GameManager.SAVE_VERSION, 2, "Save format version must be 2");
+    assert.deepStrictEqual(gm.cutBushes, [], "No bush is cut at the start");
+});
+
+test("T1-FEAT", "cutBush records a unique id and persists it with the version", () => {
+    localStorage.setItem("rpg_save_consent", "true");
+    const gm = new GameManager(GameConfig);
+    assert.strictEqual(gm.cutBush("Village:3:7"), true, "First cut must be recorded");
+    assert.strictEqual(gm.cutBush("Village:3:7"), false, "Cutting the same bush twice is ignored");
+    assert.deepStrictEqual(gm.cutBushes, ["Village:3:7"]);
+    const saved = JSON.parse(localStorage.getItem("rpg_save_v1"));
+    assert.strictEqual(saved.version, 2, "Saved payload must carry the version");
+    assert.deepStrictEqual(saved.cutBushes, ["Village:3:7"], "Cut bushes must be saved");
+});
+
+test("T1-FEAT", "Loading restores cut bushes and removes duplicates", () => {
+    localStorage.setItem("rpg_save_consent", "true");
+    localStorage.setItem("rpg_save_v1", JSON.stringify({
+        version: 2,
+        player: { hp: 80 },
+        passage: "cut",
+        openChests: [],
+        cutBushes: ["Village:3:7", "Village:3:7", "Village:9:2"],
+        sharpened: false,
+        quests: []
+    }));
+    const gm = new GameManager(GameConfig);
+    assert.strictEqual(gm.load(), true);
+    assert.deepStrictEqual(gm.cutBushes, ["Village:3:7", "Village:9:2"], "Duplicates must be collapsed");
+});
+
+test("T1-FEAT", "A legacy save without cutBushes still loads (migration)", () => {
+    localStorage.setItem("rpg_save_consent", "true");
+    localStorage.setItem("rpg_save_v1", JSON.stringify({
+        player: { hp: 70 },
+        inventory: [{ id: "sword_upgrade", name: "Pierre à aiguiser", qty: 1 }],
+        passage: "cut",
+        sharpened: false,
+        quests: []
+    }));
+    const gm = new GameManager(GameConfig);
+    assert.strictEqual(gm.load(), true, "Legacy save must remain readable");
+    assert.deepStrictEqual(gm.cutBushes, [], "Missing field defaults to an empty list");
+    assert.ok(gm.openChests.includes("chest_house"), "Legacy sword upgrade heuristic still applies");
+});
+
+test("T1-FEAT", "reset clears cut bushes", () => {
+    const gm = new GameManager(GameConfig);
+    gm.cutBush("Village:1:1");
+    gm.reset();
+    assert.deepStrictEqual(gm.cutBushes, [], "Reset must forget cut bushes");
+});
+
 test("T1-FEAT", "Inventory adds new distinct items", () => {
     const gm = new GameManager(GameConfig);
     gm.addItem({ id: "wood", name: "Bois", qty: 3 });

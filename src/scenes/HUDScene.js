@@ -15,11 +15,19 @@ class HUDScene extends Phaser.Scene {
         const label = (x, y, text, size = 16, color = '#fff5d8') =>
             this.add.text(x, y, text, { fontFamily: 'monospace', fontSize: size + 'px',
                 color, lineSpacing: 5 }).setOrigin(0, 0);
+        // Cadre pixel-art : ombre bas-droite, liseré sombre, filet doré, clous d'angle.
         const panel = (x, y, w, h) => {
             const g = this.add.graphics();
-            g.fillStyle(0x27362f, 0.55).fillRect(x + 3, y + 4, w, h);
-            g.fillStyle(0x202f30).fillRect(x, y, w, h);
-            g.lineStyle(2, 0xc5a973).strokeRect(x + 1, y + 1, w - 2, h - 2);
+            g.fillStyle(0x0b1210, 0.6).fillRect(x + 4, y + 5, w, h);
+            g.fillStyle(0x1b2a26).fillRect(x, y, w, h);
+            g.fillStyle(0x0b1210).fillRect(x, y, w, 2).fillRect(x, y + h - 2, w, 2);
+            g.fillRect(x, y, 2, h).fillRect(x + w - 2, y, 2, h);
+            g.fillStyle(0xb08d52).fillRect(x + 2, y + 2, w - 4, 1).fillRect(x + 2, y + h - 3, w - 4, 1);
+            g.fillRect(x + 2, y + 2, 1, h - 4).fillRect(x + w - 3, y + 2, 1, h - 4);
+            g.fillStyle(0xe4c98d);
+            for (const [mx, my] of [[x + 3, y + 3], [x + w - 6, y + 3], [x + 3, y + h - 6], [x + w - 6, y + h - 6]]) {
+                g.fillRect(mx, my, 3, 3);
+            }
             return g;
         };
 
@@ -35,7 +43,8 @@ class HUDScene extends Phaser.Scene {
             .setBackgroundColor('#293b34').setPadding(14, 7).setVisible(false);
 
         const dialoguePanel = panel(62, 435, 676, 141);
-        const crest = this.add.image(104, 484, 'tex_npc');
+        const crest = this.add.image(104, 484, this.textures.exists('toya_portrait') ? 'toya_portrait' : 'tex_npc');
+        if (this.textures.exists('toya_portrait')) crest.setDisplaySize(72, 72);
         this.dialogueName = label(146, 450, '', 17, '#f0ca84');
         this.dialogueText = label(146, 479, '', 17).setWordWrapWidth(559);
         const next = label(544, 548, 'Espace · Continuer', 15, '#ddcba6');
@@ -63,11 +72,8 @@ class HUDScene extends Phaser.Scene {
         if (hp !== this.lastHp) {
             this.lastHp = hp;
             this.healthText.setText('PV  ' + hp);
-            const width = Math.round(148 * state.player.hp / state.player.maxHp);
-            this.healthBar.clear().fillStyle(0x101d20).fillRect(26, 47, 148, 11);
-            this.healthBar.fillStyle(0xd86e54).fillRect(26, 47, width, 11);
-            this.healthBar.fillStyle(0xf9af84).fillRect(26, 47, width, 3);
         }
+        this.drawHealth(state);
         const village = !!this.world.currentMapData.passage;
         const goal = village && state.passage === 'meet' && !this.world.hasMoved
             ? 'ZQSD ou flèches · Rejoins le guide.'
@@ -98,6 +104,29 @@ class HUDScene extends Phaser.Scene {
         else if (this.isMenuActive && pressed('ESC')) this.toggleMenu(this.menu);
         else if (this.isMenuActive && pressed('ONE')) this.menuAction(1);
         else if (this.isMenuActive && pressed('TWO')) this.menuAction(2);
+    }
+
+    /** Barre de PV redessinée chaque frame pour faire pulser le halo sous 30 %. */
+    drawHealth(state) {
+        const ratio = Math.max(0, Math.min(1, state.player.hp / state.player.maxHp));
+        const width = Math.round(148 * ratio);
+        const low = ratio <= 0.3 && state.player.hp > 0;
+        const g = this.healthBar;
+        g.clear();
+        this.healthText.setColor(low ? '#ff9a7a' : '#fff5d8');
+        if (low) {
+            const pulse = 0.22 + 0.3 * Math.abs(Math.sin(this.time.now / 180));
+            g.fillStyle(0xff5a3c, pulse).fillRect(23, 44, 154, 17);
+        }
+        g.fillStyle(0x101d20).fillRect(26, 47, 148, 11);
+        g.fillStyle(low ? 0xb53a2b : 0xd86e54).fillRect(26, 47, width, 11);
+        g.fillStyle(low ? 0xffb199 : 0xf9af84).fillRect(26, 47, width, 3);
+        if (low && !this.lowHpNotified) {
+            this.lowHpNotified = true;
+            this.showNotice('PV bas · potion dans l’inventaire (I)');
+        } else if (!low) {
+            this.lowHpNotified = false;
+        }
     }
 
     showNotice(message) {

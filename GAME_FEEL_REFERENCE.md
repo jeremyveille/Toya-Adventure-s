@@ -123,6 +123,8 @@ Les valeurs ci-dessous sont des choix de conception de Toya, en pixels du monde 
 | Gardien : annonce | alerte à 62 px, 480 ms | Les trois marques ambrées (16, 28 et 40 px) fixent sa direction. Prendre un pas de côté puis contre-attaquer. |
 | Gardien : charge et repos | 200 px/s pendant 205 ms, puis 620 ms | Environ 41 px de course, puis une ouverture de 0,62 s. |
 | PV du gardien | 30 | Deux coups à 20 dégâts ; il encaisse sans mourir au premier. |
+| Retour à l'impact | arrêt de 46 ms (coup porté), 70 ms (dégât reçu ou ronce), secousse de 70–120 ms | La physique et les animations se figent sur l'image de contact ; la caméra tremble et le chiffre de dégâts monte au-dessus de la cible. Réglé dans `WorldScene.hitStop` et `Player.takeHit`. |
+| Sons | `swing`, `hit`, `hurt`, `bush`, `chest`, `collect`, `levelup` | Synthèse Web Audio : aucun fichier audio. Le coup d'épée part au premier pas de la préparation. |
 
 ### Progression et monde
 
@@ -135,6 +137,9 @@ Les valeurs ci-dessous sont des choix de conception de Toya, en pixels du monde 
 | Quête accomplie | +50 XP, +20 or | Une seule fois par objectif. |
 | Potion | +30 PV | Plafonnée aux PV maximaux. |
 | Rides d’eau | toutes les 180 ms | Deux traits animés par case d’eau ; le terrain est mis en texture une fois par carte (`sol-<carte>`). |
+| Ombres portées | décalage de +3 px à droite et +4 px vers le bas | Lumière du haut-gauche : joueur, ennemis, arbres, rochers, PNJ, coffre et façade suivent le même décalage (`WorldScene.addShadow`). |
+| Ronces coupées | liste `cutBushes` enregistrée avec la partie | Une ronce coupée ne repousse pas au rechargement ; identifiant `<carte>:<x>:<y>` (`GameManager.cutBush`). |
+| Format de sauvegarde | `version: 2` dans `rpg_save_v1` | Les parties sans version restent lisibles : champs absents comblés, heuristique de la pierre à aiguiser conservée. |
 
 ### États du passage
 
@@ -169,8 +174,8 @@ Une reprise replace Toya sur la rive d’arrivée pour les états `fight`, `open
 3. **Combat.** Quatre orientations, trois phases de frappe, zone active synchronisée, impact et recul bornés. La sentinelle du pont poursuit sur une courte distance, annonce sa charge puis récupère.
 4. **Décor.** Saule extrait de la ressource du dépôt, ombres de contact, plate-forme de pierre et marches praticables, tablier continu, garde-corps triés par segment et rides d'eau animées toutes les 180 ms. Le terrain fixe est mis en texture une fois par carte.
 5. **Village.** Le guide enseigne la première coupe. La ronce occupe toute la passe (collision sur une case entière, sprite affiché en 92 × 70 px). La rive sud déclenche la rencontre, puis le coffre de la terrasse donne la navette et 3 potions. Rapporter la navette achève la quête. Une reprise replace Toya sur une rive adaptée à l’étape enregistrée.
-6. **Interface.** Vie et conseil bref dans le HUD, action contextuelle au-dessus du joueur, notification d'objet et dialogue. Le sac présente l'épée équipée et permet d'appliquer la pierre de la maison.
-7. **Vérification.** `npm test` a été exécuté après chaque phase technique. La suite finale contient 5 tests historiques et 57 contrôles complémentaires, soit 62 succès. Le parcours `tests/play_village.py` pilote le clavier dans Chromium avec Phaser 3.55.2 et Arcade Physics. Il couvre la ronce solide, la traversée, la frappe, le coffre, le rechargement, le retour au guide, les deux portes et les menus. Une vérification séparée a laissé le gardien toucher puis vaincre Toya et contrôlé la reprise au point de passage. Des contrôles ciblés ont aussi vérifié le blocage de l'eau et du garde-corps ainsi que le tri et l'occlusion de l'arbre et du toit, devant et derrière le joueur.
+6. **Interface.** Vie et conseil bref dans le HUD, action contextuelle au-dessus du joueur, notification d'objet et dialogue. Les panneaux ont un cadre pixel à clous d'angle, le dialogue affiche le portrait de Toya, la barre de PV pulse sous 30 % et l'ouverture du coffre est animée. Le sac présente l'épée équipée et permet d'appliquer la pierre de la maison.
+7. **Vérification.** `npm test` a été exécuté après chaque phase technique. La suite finale contient 5 tests historiques et 62 contrôles complémentaires, soit 67 succès. Le parcours `tests/play_village.py` pilote le clavier dans Chromium avec Phaser 3.55.2 et Arcade Physics ; `npm run test:e2e` le lance sans serveur préalable. Il couvre la ronce solide, la traversée, la frappe, le coffre, le rechargement, le retour au guide, les deux portes et les menus. Une vérification séparée a laissé le gardien toucher puis vaincre Toya et contrôlé la reprise au point de passage. Des contrôles ciblés ont aussi vérifié le blocage de l'eau et du garde-corps ainsi que le tri et l'occlusion de l'arbre et du toit, devant et derrière le joueur.
 
 La compatibilité des anciennes parties conserve inventaire, statistiques et quêtes. Une conversation du guide déjà terminée reprend à la coupe. Les anciens fichiers ne contiennent pas l'historique exhaustif des coffres ouverts. La pierre présente dans le sac permet de reconnaître le coffre de la maison.
 
@@ -178,8 +183,9 @@ La compatibilité des anciennes parties conserve inventaire, statistiques et qu�
 
 | Commande | Contenu | Portée |
 |---|---|---|
-| `npm test` | 5 tests GameManager (`tests/run_tests.js`) + 57 contrôles en quatre niveaux (`tests/test_25d_suite.js`) | Sans navigateur : état de partie, cartes, déplacement, fenêtres de frappe, persistance, tri et profondeur. Ne teste pas le rendu. |
+| `npm test` | 5 tests GameManager (`tests/run_tests.js`) + 62 contrôles en quatre niveaux (`tests/test_25d_suite.js`) | Sans navigateur : état de partie, cartes, déplacement, fenêtres de frappe, persistance (ronces, coffres, version de sauvegarde), tri et profondeur. Ne teste pas le rendu. |
 | `node tests/test_25d_suite.js` | Suite 2.5D seule | Vérifie notamment que la zone de frappe reste fermée pendant la préparation, ouverte pendant la frappe dans les quatre directions, puis refermée pendant la reprise. |
+| `npm run test:e2e` | Sert le dépôt, choisit un navigateur puis exécute `tests/play_village.py` | Demande Python, le paquet `playwright` et un Chromium (variable `CHROMIUM_PATH`, sinon Edge ou Chrome installé). Sans navigateur détecté, Playwright utilise son propre build. |
 | `python tests/play_village.py` | Parcours complet piloté au clavier | Hors `npm test` : demande Python, Playwright, un Chromium (`CHROMIUM_PATH`) et un serveur déjà lancé sur `http://localhost:3000`. Avance par pas de 1/60 s via `game.headlessStep`, sans rendu. |
 
 Les contrôles Node simulent Phaser avec des objets factices : ils valident les durées, les états et les enchaînements, pas l'image affichée. La mesure de Toya a été faite à part, dans Chromium ; celle de Phantom Hourglass vient de la vidéo citée.

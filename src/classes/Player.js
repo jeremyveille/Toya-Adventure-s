@@ -112,6 +112,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.anims.stop();
         this.attackRow = { down: 0, left: 3, right: 6, up: 9 }[this.facing];
         this.setFrame(this.attackRow);
+        if (window.audioManager) window.audioManager.play('swing');
         this.slash = this.scene.add.graphics();
         this.slash.setDepth(this.depth + (this.facing === 'up' ? -0.1 : 1));
         this.updateAttack(0);
@@ -176,7 +177,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
             onComplete: () => { this.clearTint(); this.setAlpha(1); }
         });
         this.scene.events.emit('Notice', '−' + damage + ' PV');
-        window.audioManager.play('hit');
+        if (this.scene.floatText) this.scene.floatText(this.x, this.y - 46, '−' + damage, '#ff9a7a');
+        if (this.scene.hitStop) this.scene.hitStop(70);
+        if (this.scene.cameras && this.scene.cameras.main) this.scene.cameras.main.shake(120, 0.007);
+        if (window.audioManager) window.audioManager.play('hurt');
         return true;
     }
 }

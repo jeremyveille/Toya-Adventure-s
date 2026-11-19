@@ -28,6 +28,9 @@
  */
 
 class GameManager {
+    /** Version du format de sauvegarde. À incrémenter dès qu'un champ change de sens. */
+    static SAVE_VERSION = 2;
+
     /**
      * @param {Object} config - The global game configuration
      */
@@ -46,6 +49,8 @@ class GameManager {
         this.inventory = [];
         this.passage = "meet";
         this.openChests = [];
+        /** Identifiants des buissons déjà coupés, pour ne pas les faire réapparaître. */
+        this.cutBushes = [];
         this.sharpened = false;
         /** @type {Quest[]} */
         this.quests = JSON.parse(JSON.stringify(this.config.initialQuests || []));
@@ -61,10 +66,12 @@ class GameManager {
         }
         
         const data = {
+            version: GameManager.SAVE_VERSION,
             player: this.player,
             inventory: this.inventory,
             passage: this.passage,
             openChests: this.openChests,
+            cutBushes: this.cutBushes,
             sharpened: this.sharpened,
             quests: this.quests
         };
@@ -100,6 +107,8 @@ class GameManager {
                         ? data.passage : (metGuide ? 'cut' : 'meet');
                     this.openChests = Array.isArray(data.openChests) ? [...new Set(data.openChests)] : [];
                     if (!data.openChests && this.inventory.some(i => i.id === 'sword_upgrade')) this.openChests.push('chest_house');
+                    // Sauvegardes antérieures à la version 2 : aucune ronce coupée n'était mémorisée.
+                    this.cutBushes = Array.isArray(data.cutBushes) ? [...new Set(data.cutBushes)] : [];
                     this.sharpened = data.sharpened === true;
                     if (this.player.hp <= 0) this.player.hp = this.player.maxHp;
                     console.log("Partie chargée !");
@@ -137,6 +146,13 @@ class GameManager {
             this.addItem({ id: 'navette', name: 'Navette du passeur', qty: 1 }, false);
         }
         this.addItem(data.item);
+        return true;
+    }
+
+    cutBush(id) {
+        if (typeof id !== 'string' || this.cutBushes.includes(id)) return false;
+        this.cutBushes.push(id);
+        this.save();
         return true;
     }
 

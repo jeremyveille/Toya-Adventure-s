@@ -68,6 +68,8 @@ class WorldScene extends Phaser.Scene {
         this.load.spritesheet('toya', 'assets/village/toya-walk.png', { frameWidth: 32, frameHeight: 48 });
         this.load.image('saule', 'assets/village/saule.png');
         this.load.image('gardien', 'assets/village/gardien.png');
+        // Portrait de dialogue généré hors jeu puis détouré (scripts/pixelate_asset.py).
+        this.load.image('toya_portrait', 'assets/ui/toya-portrait.png');
     }
 
     create() {
@@ -266,7 +268,11 @@ class WorldScene extends Phaser.Scene {
                 } else if (cell === 'b') {
                     // Correctif Bug M4 : 'b' minuscule pour buisson récoltable
                     const gate = passage && passage.gate.x === x && passage.gate.y === y;
-                    if (!gate || ['meet', 'cut'].includes(state.passage)) this.createResource(cx, cy, ts, gate);
+                    const bushId = this.targetMapName + ':' + x + ':' + y;
+                    const alreadyCut = state.cutBushes.includes(bushId);
+                    if (!alreadyCut && (!gate || ['meet', 'cut'].includes(state.passage))) {
+                        this.createResource(cx, cy, ts, gate, bushId);
+                    }
                 } else if (cell === 'o') {
                     this.createChest(cx, cy, ts, this.currentMapData.chestsData['o']);
                 } else if (cell === '>') {
@@ -315,10 +321,8 @@ class WorldScene extends Phaser.Scene {
         this.player = new Player(this, spawnX, spawnY, 'toya');
         this.player.setDepth(Math.floor(this.player.y));
         
-        // Ombre portée sous les pieds du joueur
-        this.playerShadow = this.add.sprite(this.player.x, this.player.y, 'tex_shadow');
-        this.playerShadow.setScale(1.6, 1.0);
-        this.playerShadow.setDepth(Math.floor(this.player.y) - 0.5);
+        // Ombre portée sous les pieds du joueur, décalée vers le bas-droite (lumière du haut-gauche)
+        this.playerShadow = this.addShadow(this.player.x, this.player.y, 1.6, 1.0);
 
         // --- AMBIANCE & POST-PROCESSING 2.5D ---
         let overlayColor = this.targetMapName === "House1" ? 0x000000 : 0xffdda1;
@@ -369,14 +373,71 @@ class WorldScene extends Phaser.Scene {
         return wall;
     }
 
+    /**
+     * Lumière venant du haut-gauche : toute ombre de contact se décale de 3 px à droite
+     * et de 4 px vers le bas. Renvoie le sprite d'ombre pour les mises à jour par frame.
+     */
+    addShadow(x, y, scaleX = 1, scaleY = 1, depth = null) {
+        const shadow = this.add.sprite(Math.round(x + 3), Math.round(y + 4), 'tex_shadow');
+        shadow.setScale(scaleX, scaleY);
+        shadow.setDepth(depth !== null ? depth : Math.floor(y) - 0.5);
+        return shadow;
+    }
+
+    /**
+     * Fige brièvement le monde sur l'image d'impact (hit-stop). La physique et les
+     * animations sont suspendues, mais pas les horloges, la caméra ni les tweens.
+     */
+    hitStop(duration = 48) {
+        const now = this.time.now;
+        if (this.hitStopUntil && now < this.hitStopUntil) return;
+        this.hitStopUntil = now + duration;
+        this.physics.world.pause();
+        this.anims.pauseAll();
+        this.time.delayedCall(duration, () => {
+            this.physics.world.resume();
+            this.anims.resumeAll();
+        });
+    }
+
+    /** Texte flottant de retour (dégâts, butin) : monte puis s'efface. */
+    floatText(x, y, message, color = '#fff5d8') {
+        const text = this.add.text(Math.round(x), Math.round(y), message, {
+            fontSize: '11px', fontFamily: '"Press Start 2P"', color,
+            stroke: '#000', strokeThickness: 3
+        }).setOrigin(0.5).setDepth(9002);
+        this.tweens.add({
+            targets: text, y: Math.round(y) - 34, alpha: 0, duration: 900,
+            ease: 'Cubic.easeOut', onComplete: () => text.destroy()
+        });
+        return text;
+    }
+
+    /** Gerbe de feuilles pixel (texture tex_leaf) réutilisée pour la coupe et les impacts. */
+    leafBurst(x, y, count = 8) {
+        for (let i = 0; i < count; i++) {
+            const leaf = this.add.image(Math.round(x), Math.round(y), 'tex_leaf')
+                .setDepth(Math.floor(y) + 12)
+                .setScale(Phaser.Math.Between(1, 2))
+                .setAngle(Phaser.Math.Between(0, 360));
+            this.physics.add.existing(leaf);
+            leaf.body.setVelocity(Phaser.Math.Between(-95, 95), Phaser.Math.Between(-120, 10));
+            this.tweens.add({
+                targets: leaf,
+                angle: leaf.angle + Phaser.Math.Between(-220, 220),
+                alpha: 0,
+                duration: 520 + i * 20,
+                onComplete: () => leaf.destroy()
+            });
+        }
+    }
+
     createProp(cx, cy, ts, tex) {
         let sprite = this.add.sprite(cx, cy + ts * 0.2, tex);
         sprite.setOrigin(0.5, 0.85);
         let baseDepth = Math.floor(cy + ts * 0.2);
         sprite.setDepth(baseDepth);
-        let shadow = this.add.sprite(cx, cy + ts * 0.2, 'tex_shadow');
-        shadow.setScale(1.2, 0.8);
-        shadow.setDepth(baseDepth - 0.5);
+        this.addShadow(cx, cy + ts * 0.2, 1.2, 0.8, baseDepth - 0.5);
         return sprite;
     }
 
@@ -426,7 +487,7 @@ class WorldScene extends Phaser.Scene {
         const w = (isSmall ? 52 : 100) + variety * 4;
         const h = (isSmall ? 70 : 132) + variety * 4;
         this.createWall(cx, base - 3, isSmall ? 20 : 30, isSmall ? 10 : 16);
-        this.add.image(cx + 4, base - 2, 'tex_shadow').setScale(isSmall ? 1.2 : 2, 0.8).setDepth(3);
+        this.addShadow(cx, base - 2, isSmall ? 1.2 : 2, 0.8, 3);
         const tree = this.add.image(cx, base, 'saule').setOrigin(0.5, 1).setDisplaySize(w, h).setDepth(base);
         this.occlusionManager.register(tree, {
             minX: cx - w * 0.42, maxX: cx + w * 0.42,
@@ -445,7 +506,7 @@ class WorldScene extends Phaser.Scene {
         cliff.setDepth(baseDepth);
 
         this.createWall(cx, cy + ts * 0.15, ts, ts * 0.7);
-        this.add.image(cx + 2, cy + ts * 0.45, 'tex_shadow').setScale(2.2, 0.8).setDepth(3);
+        this.addShadow(cx, cy + ts * 0.45, 2.2, 0.8, 3);
     }
 
     createRuin(cx, cy, ts, isSmall) {
@@ -456,10 +517,7 @@ class WorldScene extends Phaser.Scene {
         sprite.setOrigin(0.5, 0.85);
         let baseDepth = Math.floor(cy + ts * 0.25);
         sprite.setDepth(baseDepth);
-        
-        let shadow = this.add.sprite(cx, cy + ts * 0.25, 'tex_shadow');
-        shadow.setScale(isSmall ? 1.0 : 1.6, 0.7);
-        shadow.setDepth(baseDepth - 0.5);
+        this.addShadow(cx, cy + ts * 0.25, isSmall ? 1.0 : 1.6, 0.7, baseDepth - 0.5);
     }
 
     createIndoorWall(cx, cy, ts) {
@@ -471,9 +529,7 @@ class WorldScene extends Phaser.Scene {
     createNPC(cx, cy, ts, data) {
         this.createWall(cx, cy + ts * 0.2, 28, 20);
         let baseDepth = Math.floor(cy + ts * 0.25);
-        let shadow = this.add.sprite(cx, cy + ts * 0.25, 'tex_shadow');
-        shadow.setScale(1.2, 0.8);
-        shadow.setDepth(baseDepth - 0.5);
+        this.addShadow(cx, cy + ts * 0.25, 1.2, 0.8, baseDepth - 0.5);
 
         let sprite = this.add.sprite(cx, cy + ts * 0.25, 'tex_npc');
         sprite.setOrigin(0.5, 0.9);
@@ -497,10 +553,7 @@ class WorldScene extends Phaser.Scene {
 
     createEnemy(cx, cy, type) {
         let enemy = new Enemy(this, cx, cy, 'gardien', type);
-        let shadow = this.add.sprite(cx, cy, 'tex_shadow');
-        shadow.setScale(1.6, 1.0);
-        shadow.setDepth(Math.floor(cy) - 0.5);
-        enemy.shadow = shadow;
+        enemy.shadow = this.addShadow(cx, cy, 1.6, 1.0);
         this.enemies.add(enemy);
         if (this.currentMapData.passage) {
             enemy.onDefeat = () => {
@@ -509,7 +562,7 @@ class WorldScene extends Phaser.Scene {
         }
     }
 
-    createResource(cx, cy, ts, gate) {
+    createResource(cx, cy, ts, gate, bushId = null) {
         let zone = this.createWall(cx, cy + ts * 0.2, gate ? ts : 28, 20);
         let sprite = this.add.sprite(cx, cy + ts * 0.2, 'tex_bush');
         sprite.setOrigin(0.5, 0.85);
@@ -517,6 +570,7 @@ class WorldScene extends Phaser.Scene {
         
         if (gate) sprite.setDisplaySize(92, 70);
         zone.isGate = gate;
+        zone.bushId = bushId;
         zone.sprite = sprite;
         this.resourceGroup.add(zone);
     }
@@ -528,9 +582,7 @@ class WorldScene extends Phaser.Scene {
         let baseDepth = Math.floor(cy + ts * 0.2);
         sprite.setDepth(baseDepth);
 
-        let shadow = this.add.sprite(cx, cy + ts * 0.2, 'tex_shadow');
-        shadow.setScale(1.2, 0.8);
-        shadow.setDepth(baseDepth - 0.5);
+        this.addShadow(cx, cy + ts * 0.2, 1.2, 0.8, baseDepth - 0.5);
 
         let zone = this.add.zone(cx, cy, ts * 1.2, ts * 1.2);
         this.physics.add.existing(zone, true);
@@ -565,10 +617,8 @@ class WorldScene extends Phaser.Scene {
         houseSprite.setOrigin(0.5, 1.0);
         houseSprite.setDepth(baseY);
 
-        // Ombre de contact au sol
-        let houseShadow = this.add.sprite(cx, baseY - 5, 'tex_shadow');
-        houseShadow.setScale(width / 32 * 0.95, 2.5);
-        houseShadow.setDepth(baseY - 0.5);
+        // Ombre de contact au sol, étirée sous la façade
+        this.addShadow(cx, baseY - 5, width / 32 * 0.95, 2.5, baseY - 0.5);
 
         // Enregistrement du toit dans l'OcclusionManager
         if (this.occlusionManager) {
@@ -888,9 +938,15 @@ class WorldScene extends Phaser.Scene {
             const data = zone.chestData;
             const passageChest = this.currentMapData.passage?.chestId === data.id;
             if (state.openChest(data, passageChest)) {
+                // Ouverture animée : le couvercle bascule, une gerbe dorée marque la récompense.
                 zone.sprite.setTexture('tex_chest_opened');
+                this.tweens.add({ targets: zone.sprite, scaleX: 1.14, scaleY: 1.14,
+                    duration: 90, yoyo: true, ease: 'Quad.easeOut' });
+                this.impact(zone.x, zone.y - 18, 0xffd76a);
+                this.impact(zone.x, zone.y - 8, 0xfff0c0);
+                this.floatText(zone.x, zone.y - 38, passageChest ? 'Navette du passeur' : data.item.name, '#ffe9a8');
                 this.events.emit('Notice', passageChest ? 'Navette du passeur · 3 potions' : data.item.name);
-                window.audioManager.play('collect');
+                if (window.audioManager) window.audioManager.play('chest');
             } else if (!state.openChests.includes(data.id)) {
                 this.events.emit('Notice', 'Le gardien veille encore.');
             }
@@ -924,16 +980,16 @@ class WorldScene extends Phaser.Scene {
 
         this.player.update(delta);
         
-        // Synchronisation de l'ombre au sol du joueur (baseY - 0.5)
+        // Synchronisation de l'ombre au sol du joueur (décalage bas-droite)
         if (this.playerShadow) {
-            this.playerShadow.setPosition(this.player.x, this.player.y);
+            this.playerShadow.setPosition(Math.round(this.player.x + 3), Math.round(this.player.y + 4));
             this.playerShadow.setDepth(Math.floor(this.player.y) - 0.5);
         }
         
         // Synchronisation des ombres des ennemis
         this.enemies.getChildren().forEach(e => {
             if (e.shadow && e.active) {
-                e.shadow.setPosition(e.x, e.y);
+                e.shadow.setPosition(Math.round(e.x + 3), Math.round(e.y + 4));
                 e.shadow.setDepth(Math.floor(e.y) - 0.5);
             }
             if (e.hp <= 0 && e.shadow) {
@@ -963,21 +1019,29 @@ class WorldScene extends Phaser.Scene {
     }
 
     hitMinorEnemy(weaponBox, enemy) {
-        if (!enemy.isFlashing && !this.player.hitTargets.has(enemy)) {
-            this.player.hitTargets.add(enemy);
-            let dmg = window.gameState ? window.gameState.player.damage : 10;
-            enemy.takeDamage(dmg);
-            this.impact(weaponBox.x, weaponBox.y, 0xffdf86);
-            if (window.audioManager) window.audioManager.play('hit');
-        }
+        if (enemy.isFlashing || this.player.hitTargets.has(enemy)) return;
+        this.player.hitTargets.add(enemy);
+        let dmg = window.gameState ? window.gameState.player.damage : 10;
+        enemy.takeDamage(dmg);
+        this.impact(weaponBox.x, weaponBox.y, 0xffdf86);
+        this.floatText(enemy.x, enemy.y - 42, '−' + dmg, '#ffd98a');
+        this.hitStop(46);
+        this.cameras.main.shake(70, 0.004);
+        if (window.audioManager) window.audioManager.play('hit');
     }
 
     impact(x, y, color) {
         for (const [dx, dy] of [[-8, -6], [7, -9], [-6, 5], [9, 3]]) {
-            const fleck = this.add.rectangle(x, y - 6, 4, 3, color).setDepth(Math.floor(y) + 25);
+            const fleck = this.add.rectangle(Math.round(x), Math.round(y) - 6, 3, 3, color)
+                .setDepth(Math.floor(y) + 25);
+            fleck.setScale(Phaser.Math.Between(1, 2));
             this.tweens.add({ targets: fleck, x: x + dx, y: y + dy - 6, alpha: 0,
                 duration: 140, onComplete: () => fleck.destroy() });
         }
+        const spark = this.add.rectangle(Math.round(x), Math.round(y) - 8, 2, 2, 0xfff6df)
+            .setDepth(Math.floor(y) + 26);
+        this.tweens.add({ targets: spark, y: spark.y - 4, alpha: 0, duration: 90,
+            onComplete: () => spark.destroy() });
     }
 
     hitResource(weaponBox, resZone) {
@@ -991,25 +1055,17 @@ class WorldScene extends Phaser.Scene {
             window.gameState.passage = 'cross';
         }
         resZone.isDestroyed = true;
-        
+
+        this.leafBurst(resZone.x, resZone.y - 8, resZone.isGate ? 14 : 8);
+        this.hitStop(70);
+        this.cameras.main.shake(110, 0.006);
         this.events.emit('Notice', '+1 bois');
-        
-        for(let i=0; i<6; i++) {
-            let p = this.add.rectangle(resZone.x, resZone.y, 8, 8, 0x4caf50);
-            p.setDepth(Math.floor(resZone.y) + 10);
-            this.physics.add.existing(p);
-            p.body.setVelocity(Phaser.Math.Between(-80,80), Phaser.Math.Between(-100,20));
-            this.tweens.add({ targets: p, alpha: 0, duration: 600, onComplete: () => p.destroy() });
-        }
-        
-        let itemId = 'wood';
-        let itemName = 'Bois';
-        window.gameState.addItem({ id: itemId, name: itemName, qty: 1 });
-        if (window.audioManager) window.audioManager.play('collect');
-        
-        let txt = this.add.text(resZone.x, resZone.y - 20, `+1 ${itemName}`, { fontSize: '10px', fontFamily: '"Press Start 2P"', color: '#ffffff', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5).setDepth(9002);
-        this.tweens.add({ targets: txt, y: txt.y - 40, alpha: 0, duration: 1500, onComplete: () => txt.destroy() });
-        
+        this.floatText(resZone.x, resZone.y - 24, '+1 bois');
+
+        if (resZone.bushId) window.gameState.cutBush(resZone.bushId);
+        window.gameState.addItem({ id: 'wood', name: 'Bois', qty: 1 });
+        if (window.audioManager) window.audioManager.play('bush');
+
         resZone.sprite.destroy();
         this.walls.remove(resZone);
         resZone.destroy();

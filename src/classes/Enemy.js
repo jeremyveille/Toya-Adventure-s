@@ -22,34 +22,6 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
 
         this.hp = type === 'minor' ? 30 : 100;
         this.isFlashing = false;
-
-        // Mouvement aléatoire simple
-        if(this.enemyType === 'shooter') {
-            this.moveEvent = scene.time.addEvent({
-                delay: 2000,
-                callback: this.randomWander,
-                callbackScope: this,
-                loop: true
-            });
-        }
-
-        // Tir pour le shooter
-        if (this.enemyType === 'shooter') {
-            this.setTint(0x00ffff); // Cyan
-            this.shootEvent = scene.time.addEvent({
-                delay: 3000,
-                callback: this.shootAtPlayer,
-                callbackScope: this,
-                loop: true
-            });
-        }
-    }
-
-    randomWander() {
-        if(this.isFlashing) return; // Ne bouge pas quand on prend un coup
-        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [0,0]];
-        const dir = Phaser.Utils.Array.GetRandom(directions);
-        this.setVelocity(dir[0] * 50, dir[1] * 50);
     }
 
     preUpdate(time, delta) {
@@ -124,32 +96,6 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.clearTint();
     }
 
-    shootAtPlayer() {
-        if (this.hp <= 0 || !this.scene || !this.scene.player) return;
-        
-        let dx = this.scene.player.x - this.x;
-        let dy = (this.scene.player.y - 15) - (this.y - 20);
-        
-        // Tire seulement si proche (max 400px)
-        if (dx*dx + dy*dy > 400*400) return;
-        
-        let vec = new Phaser.Math.Vector2(dx, dy).normalize().scale(250);
-        let bullet = this.scene.add.circle(this.x, this.y - 20, 8, 0xff0000);
-        this.scene.physics.add.existing(bullet);
-        bullet.body.setVelocity(vec.x, vec.y);
-        bullet.setDepth(Math.floor(this.y) + 10);
-        
-        this.scene.time.delayedCall(2000, () => {
-            if (bullet && bullet.active) bullet.destroy();
-        });
-        
-        const collider = this.scene.physics.add.overlap(this.scene.player, bullet, (p, b) => {
-            if (b && b.active) b.destroy();
-            p.takeHit(10);
-        }, null, this.scene);
-        bullet.once('destroy', () => collider.destroy());
-    }
-
     takeDamage(amount) {
         if (this.isFlashing) return; // Invincibilité temporaire
 
@@ -181,8 +127,6 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
     die() {
         this.clearWarning();
         if (this.onDefeat) this.onDefeat();
-        if(this.moveEvent) this.moveEvent.remove();
-        if(this.shootEvent) this.shootEvent.remove();
         if(this.shadow) {
             this.shadow.destroy();
             this.shadow = null;
