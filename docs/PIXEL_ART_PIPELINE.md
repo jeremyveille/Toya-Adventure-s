@@ -64,6 +64,12 @@ signature, frame, border, scenery, multiple characters, deformed face
 
 Le résultat est vérifié à l'œil avant intégration : le détourage laisse parfois une frange, que `--tolerance` corrige.
 
+## Dépannage
+
+- `400 ... value_smaller_than_min` sur `seed` : le workflow générique `generate_image` livré avec le serveur MCP contient `"seed": -1`, refusé par ComfyUI (minimum 0). Remplacer par un entier valide, ou par `PARAM_INT_SEED` en fournissant explicitement une graine (`-1` est alors tiré au hasard par le MCP).
+- `400 ... required_input_missing` : le MCP laisse les paramètres optionnels non fournis à `undefined`, et la clé disparaît du JSON envoyé. Toujours passer `width`, `height` et `steps` (et `seed` si le workflow le déclare).
+- `list_checkpoint_models` peut renvoyer une liste vide alors que ComfyUI connaît le modèle : vérifier directement `GET http://127.0.0.1:8188/object_info/CheckpointLoaderSimple`.
+
 ## Intégration
 
 - Le portrait est chargé dans `WorldScene.preload` sous la clé `toya_portrait` et affiché par `HUDScene` (repli sur `tex_npc` si la texture manque).
