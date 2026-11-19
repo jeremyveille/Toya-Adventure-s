@@ -9,8 +9,11 @@ class HUDScene extends Phaser.Scene {
         this.isMenuActive = false;
         this.menu = '';
         this.lastHp = '';
+        this.lastSound = '';
         this.dialogueCallback = null;
-        this.keys = this.input.keyboard.addKeys('SPACE,I,J,C,ONE,TWO,ESC');
+        this.keys = this.input.keyboard.addKeys('SPACE,I,J,C,ONE,TWO,ESC,M');
+        this.reducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+            ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
 
         const label = (x, y, text, size = 16, color = '#fff5d8') =>
             this.add.text(x, y, text, { fontFamily: 'monospace', fontSize: size + 'px',
@@ -31,9 +34,12 @@ class HUDScene extends Phaser.Scene {
             return g;
         };
 
-        panel(14, 14, 172, 57);
-        this.healthText = label(26, 22, '', 15);
+        panel(14, 14, 196, 78);
+        this.healthText = label(26, 20, '', 15);
         this.healthBar = this.add.graphics();
+        this.soundText = label(198, 21, 'SON', 10, '#8fc9b3').setOrigin(1, 0);
+        this.xpText = label(26, 56, '', 10, '#ecc682');
+        this.xpBar = this.add.graphics();
         this.goalPanel = panel(390, 14, 396, 48);
         this.place = label(402, 19, '', 12, '#ecc682');
         this.goal = label(402, 36, '', 15);
@@ -43,8 +49,8 @@ class HUDScene extends Phaser.Scene {
             .setBackgroundColor('#293b34').setPadding(14, 7).setVisible(false);
 
         const dialoguePanel = panel(62, 435, 676, 141);
-        const crest = this.add.image(104, 484, this.textures.exists('toya_portrait') ? 'toya_portrait' : 'tex_npc');
-        if (this.textures.exists('toya_portrait')) crest.setDisplaySize(72, 72);
+        const crest = this.add.image(104, 492, this.textures.exists('toya_portrait') ? 'toya_portrait' : 'tex_npc');
+        if (this.textures.exists('toya_portrait')) crest.setDisplaySize(64, 64);
         this.dialogueName = label(146, 450, '', 17, '#f0ca84');
         this.dialogueText = label(146, 479, '', 17).setWordWrapWidth(559);
         const next = label(544, 548, 'Espace · Continuer', 15, '#ddcba6');
@@ -74,6 +80,8 @@ class HUDScene extends Phaser.Scene {
             this.healthText.setText('PV  ' + hp);
         }
         this.drawHealth(state);
+        this.drawProgress(state);
+        this.drawSound();
         const village = !!this.world.currentMapData.passage;
         const goal = village && state.passage === 'meet' && !this.world.hasMoved
             ? 'ZQSD ou flèches · Rejoins le guide.'
@@ -94,6 +102,10 @@ class HUDScene extends Phaser.Scene {
         }
         if (this.world.isDead || this.world.transitioning || window.privacyDialogOpen) return;
         const pressed = key => Phaser.Input.Keyboard.JustDown(this.keys[key]);
+        if (pressed('M')) {
+            const muted = window.audioManager ? window.audioManager.toggleMute() : false;
+            this.showNotice(muted ? 'Son coupé · M pour rétablir' : 'Son activé');
+        }
         if (this.isDialogueActive) {
             if (pressed('SPACE') || pressed('ESC')) this.endDialogue();
             return;
@@ -115,18 +127,41 @@ class HUDScene extends Phaser.Scene {
         g.clear();
         this.healthText.setColor(low ? '#ff9a7a' : '#fff5d8');
         if (low) {
-            const pulse = 0.22 + 0.3 * Math.abs(Math.sin(this.time.now / 180));
-            g.fillStyle(0xff5a3c, pulse).fillRect(23, 44, 154, 17);
+            const pulse = this.reducedMotion ? 0.3 : 0.22 + 0.3 * Math.abs(Math.sin(this.time.now / 180));
+            g.fillStyle(0xff5a3c, pulse).fillRect(23, 37, 154, 17);
         }
-        g.fillStyle(0x101d20).fillRect(26, 47, 148, 11);
-        g.fillStyle(low ? 0xb53a2b : 0xd86e54).fillRect(26, 47, width, 11);
-        g.fillStyle(low ? 0xffb199 : 0xf9af84).fillRect(26, 47, width, 3);
+        g.fillStyle(0x101d20).fillRect(26, 40, 148, 11);
+        g.fillStyle(low ? 0xb53a2b : 0xd86e54).fillRect(26, 40, width, 11);
+        g.fillStyle(low ? 0xffb199 : 0xf9af84).fillRect(26, 40, width, 3);
         if (low && !this.lowHpNotified) {
             this.lowHpNotified = true;
             this.showNotice('PV bas · potion dans l’inventaire (I)');
         } else if (!low) {
             this.lowHpNotified = false;
         }
+    }
+
+    /** Niveau, or et jauge d'expérience vers le prochain niveau. */
+    drawProgress(state) {
+        const need = Math.max(1, state.player.level * 100);
+        const ratio = Math.max(0, Math.min(1, state.player.xp / need));
+        const width = Math.round(148 * ratio);
+        const g = this.xpBar;
+        this.xpText.setText('Niv. ' + state.player.level + ' · ' + state.player.gold + ' or');
+        g.clear();
+        g.fillStyle(0x0c1714).fillRect(26, 68, 148, 7);
+        g.fillStyle(0x2f5048).fillRect(26, 68, 148, 1);
+        g.fillStyle(0x3f8474).fillRect(26, 69, width, 5);
+        g.fillStyle(0x9fe0c8).fillRect(26, 69, width, 2);
+    }
+
+    /** Indicateur discret de l'état du son, mémorisé dans le navigateur. */
+    drawSound() {
+        const muted = !!(window.audioManager && window.audioManager.muted);
+        const text = muted ? 'MUET' : 'SON';
+        if (text === this.lastSound) return;
+        this.lastSound = text;
+        this.soundText.setText(text).setColor(muted ? '#ff9a7a' : '#8fc9b3');
     }
 
     showNotice(message) {
@@ -191,7 +226,8 @@ class HUDScene extends Phaser.Scene {
         let lines;
         if (this.menu === 'Inventaire') {
             lines = ['Équipement · ' + (state.sharpened ? 'Épée affûtée' : 'Épée de Toya') + ' · ' + state.player.damage + ' dégâts',
-                'Niveau ' + state.player.level + '   ·   ' + state.player.gold + ' pièces', '',
+                'Niveau ' + state.player.level + '   ·   ' + state.player.xp + '/' + (state.player.level * 100) +
+                ' XP   ·   ' + state.player.gold + ' pièces', '',
                 ...state.inventory.map(i => i.name + ' × ' + i.qty)];
             if (!state.inventory.length) lines.push('Sac vide');
             lines.push('', '1  Boire une potion (+30 PV)');

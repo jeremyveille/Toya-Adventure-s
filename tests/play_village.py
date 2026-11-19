@@ -151,6 +151,17 @@ def play_village(page):
     t.advance(3)
     t.check("hud.menu === 'Atelier'")
     t.tap('Escape')
+    t.advance(3)
+
+    # Options audio et progression visibles dans le HUD.
+    t.tap('m')
+    t.advance(3)
+    t.check("audioManager.muted === true && localStorage.getItem('rpg_audio_muted') === 'true'")
+    t.check("hud.soundText.text === 'MUET'")
+    t.tap('m')
+    t.advance(3)
+    t.check("audioManager.muted === false && hud.soundText.text === 'SON'")
+    t.check("hud.xpText.text.indexOf('Niv.') === 0")
 
 
 if __name__ == '__main__':

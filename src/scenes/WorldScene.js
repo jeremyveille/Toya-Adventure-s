@@ -62,6 +62,9 @@ class WorldScene extends Phaser.Scene {
         this.isDead = false;
         this.transitioning = false;
         this.hasMoved = false;
+        // Respecte le réglage système « réduire les animations » : pas de secousse.
+        this.reducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+            ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
     }
 
     preload() {
@@ -389,6 +392,8 @@ class WorldScene extends Phaser.Scene {
      * animations sont suspendues, mais pas les horloges, la caméra ni les tweens.
      */
     hitStop(duration = 48) {
+        // Mode « réduire les animations » : l'arrêt reste lisible mais deux fois plus court.
+        if (this.reducedMotion) duration = Math.min(duration, 24);
         const now = this.time.now;
         if (this.hitStopUntil && now < this.hitStopUntil) return;
         this.hitStopUntil = now + duration;
@@ -398,6 +403,12 @@ class WorldScene extends Phaser.Scene {
             this.physics.world.resume();
             this.anims.resumeAll();
         });
+    }
+
+    /** Secousse de caméra centralisée : ignorée si l'utilisateur réduit les animations. */
+    shake(duration, intensity) {
+        if (this.reducedMotion || !this.cameras || !this.cameras.main) return;
+        this.cameras.main.shake(duration, intensity);
     }
 
     /** Texte flottant de retour (dégâts, butin) : monte puis s'efface. */
@@ -940,8 +951,10 @@ class WorldScene extends Phaser.Scene {
             if (state.openChest(data, passageChest)) {
                 // Ouverture animée : le couvercle bascule, une gerbe dorée marque la récompense.
                 zone.sprite.setTexture('tex_chest_opened');
-                this.tweens.add({ targets: zone.sprite, scaleX: 1.14, scaleY: 1.14,
-                    duration: 90, yoyo: true, ease: 'Quad.easeOut' });
+                if (!this.reducedMotion) {
+                    this.tweens.add({ targets: zone.sprite, scaleX: 1.14, scaleY: 1.14,
+                        duration: 90, yoyo: true, ease: 'Quad.easeOut' });
+                }
                 this.impact(zone.x, zone.y - 18, 0xffd76a);
                 this.impact(zone.x, zone.y - 8, 0xfff0c0);
                 this.floatText(zone.x, zone.y - 38, passageChest ? 'Navette du passeur' : data.item.name, '#ffe9a8');
@@ -1026,7 +1039,7 @@ class WorldScene extends Phaser.Scene {
         this.impact(weaponBox.x, weaponBox.y, 0xffdf86);
         this.floatText(enemy.x, enemy.y - 42, '−' + dmg, '#ffd98a');
         this.hitStop(46);
-        this.cameras.main.shake(70, 0.004);
+        this.shake(70, 0.004);
         if (window.audioManager) window.audioManager.play('hit');
     }
 
@@ -1058,7 +1071,7 @@ class WorldScene extends Phaser.Scene {
 
         this.leafBurst(resZone.x, resZone.y - 8, resZone.isGate ? 14 : 8);
         this.hitStop(70);
-        this.cameras.main.shake(110, 0.006);
+        this.shake(110, 0.006);
         this.events.emit('Notice', '+1 bois');
         this.floatText(resZone.x, resZone.y - 24, '+1 bois');
 

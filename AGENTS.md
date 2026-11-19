@@ -9,7 +9,7 @@ Prototype d'action-RPG 2D en vue de dessus (style Akira Toriyama) avec Phaser 3.
 
 ## Commandes
 - `npm start` : `npx serve -l 3000` → http://localhost:3000. Pas de hot reload : recharger le navigateur.
-- `npm test` : 67 succès (5 tests GameManager + 62 contrôles 2.5D), sans navigateur.
+- `npm test` : 70 succès (5 tests GameManager + 65 contrôles 2.5D), sans navigateur.
 - Suite ciblée : `node tests/test_25d_suite.js`.
 - `npm run test:e2e` : Playwright + Python, sert le dépôt sur un port libre et pilote `tests/play_village.py`. Prérequis : `python -m pip install playwright` et un Chromium (`CHROMIUM_PATH`, sinon Edge ou Chrome installé).
 - Les logs `Sauvegarde ignorée (pas de consentement RGPD)` sont normaux ; se fier au résumé final et au code de sortie.
@@ -36,7 +36,7 @@ Prototype d'action-RPG 2D en vue de dessus (style Akira Toriyama) avec Phaser 3.
 - Les tests verrouillent des noms de fichiers et des dimensions ; ne pas déplacer/renommer les assets sans mettre à jour `index.html`, `preload()` et les tests.
 
 ## Contrôles et conventions
-- UI, commentaires et documentation en français ; contrôles ZQSD (AZERTY) + flèches, `Maj` courir, `Espace` attaquer, `E` interagir, `Échap` fermer.
+- UI, commentaires et documentation en français ; contrôles ZQSD (AZERTY) + flèches, `Maj` courir, `Espace` attaquer, `E` interagir, `Échap` fermer, `M` couper le son.
 - Menus : `I` inventaire, `J` quêtes, `C` atelier (le README historique parle de craft sur `C`, cohérent avec ce dépôt).
 - `index.html` porte la modale RGPD et `window.announce()` (aria-live) ; conserver ces comportements.
 - Toute modification de gameplay doit rester couverte : ajouter un contrôle dans `tests/test_25d_suite.js` et mettre à jour les totaux cités dans `README.md` et `GAME_FEEL_REFERENCE.md`.

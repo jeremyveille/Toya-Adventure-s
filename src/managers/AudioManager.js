@@ -1,17 +1,54 @@
+/**
+ * Synthétiseur Web Audio : aucun fichier audio n'est chargé.
+ * Le choix « son coupé » est mémorisé séparément de la sauvegarde de partie.
+ */
 class AudioManager {
     constructor() {
-        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.muted = false;
+        try {
+            this.muted = typeof localStorage !== 'undefined' && localStorage.getItem('rpg_audio_muted') === 'true';
+        } catch (error) {
+            this.muted = false;
+        }
+
+        const Context = window.AudioContext || window.webkitAudioContext;
+        this.ctx = Context ? new Context() : null;
+        this.master = null;
+        if (this.ctx) {
+            this.master = this.ctx.createGain();
+            this.master.gain.value = this.muted ? 0 : 1;
+            this.master.connect(this.ctx.destination);
+        }
+    }
+
+    /** Coupe ou rétablit le son et mémorise le choix sur l'appareil. */
+    setMuted(value) {
+        this.muted = !!value;
+        if (this.master) this.master.gain.value = this.muted ? 0 : 1;
+        try {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('rpg_audio_muted', this.muted ? 'true' : 'false');
+            }
+        } catch (error) {
+            // Stockage indisponible (navigation privée) : le choix reste valable pour la session.
+        }
+        return this.muted;
+    }
+
+    toggleMute() {
+        return this.setMuted(!this.muted);
     }
 
     play(type) {
-        if (!this.ctx) return;
+        if (!this.ctx || this.muted) return;
         if (this.ctx.state === 'suspended') this.ctx.resume();
-        let osc = this.ctx.createOscillator();
-        let gain = this.ctx.createGain();
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
 
-        let now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.master || this.ctx.destination);
+
+        const now = this.ctx.currentTime;
         if (type === 'hit') {
             osc.type = 'square';
             osc.frequency.setValueAtTime(150, now);
@@ -67,6 +104,10 @@ class AudioManager {
             gain.gain.setValueAtTime(0.09, now);
             gain.gain.linearRampToValueAtTime(0, now + 0.4);
             osc.start(now); osc.stop(now + 0.4);
+        } else {
+            // Type inconnu : ne pas laisser un oscillateur connecté mais jamais démarré.
+            osc.disconnect();
+            gain.disconnect();
         }
     }
 }

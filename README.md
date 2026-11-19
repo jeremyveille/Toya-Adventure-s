@@ -11,7 +11,7 @@ Un action-RPG en pixel-art trois quarts pour navigateur, développé avec Phaser
 ## Tests
 
 Les tests Node couvrent l’état de partie, les cartes, le déplacement et les fenêtres de frappe.
-- **Lancer les tests** : `npm test` (67 succès : 5 tests d’état + 62 contrôles 2.5D)
+- **Lancer les tests** : `npm test` (70 succès : 5 tests d’état + 65 contrôles 2.5D)
 - **Parcours navigateur** : `npm run test:e2e` (Python + Playwright, navigateur Chromium/Edge/Chrome)
 
 Ces tests valident :
@@ -56,7 +56,7 @@ Ces tests valident :
 - **Courir** : Maintenir `MAJ` (Shift).
 - **Attaque (Temps réel)** : `Espace`.
 - **Interaction (Parler, etc.)** : Touche `E`.
-- **Interface** : `I` (Inventaire), `J` (Quêtes), `C` (Crafting).
+- **Interface** : `I` (Inventaire), `J` (Quêtes), `C` (Crafting), `M` (Couper/rétablir le son).
 
 ## Modifier le premier niveau
 
@@ -69,3 +69,5 @@ Ces tests valident :
 Le scénario de régression navigateur utilise Playwright pour Python. `npm run test:e2e` sert le dépôt, détecte Edge ou Chrome (ou `CHROMIUM_PATH`) puis exécute `tests/play_village.py`. Sans serveur automatique, lancer `npm start` puis `python tests/play_village.py http://localhost:3000`. Le test ouvre une partie de test isolée et pilote les touches jusqu'au retour de la maison. Le jeu lui-même et `npm test` ne nécessitent pas Playwright.
 
 Le diagnostic, les sources et les réglages sont détaillés dans [GAME_FEEL_REFERENCE.md](GAME_FEEL_REFERENCE.md).
+
+Les illustrations fixes peuvent être générées avec ComfyUI puis détourées : voir [docs/PIXEL_ART_PIPELINE.md](docs/PIXEL_ART_PIPELINE.md).

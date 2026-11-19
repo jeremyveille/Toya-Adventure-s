@@ -179,7 +179,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.scene.events.emit('Notice', '−' + damage + ' PV');
         if (this.scene.floatText) this.scene.floatText(this.x, this.y - 46, '−' + damage, '#ff9a7a');
         if (this.scene.hitStop) this.scene.hitStop(70);
-        if (this.scene.cameras && this.scene.cameras.main) this.scene.cameras.main.shake(120, 0.007);
+        if (this.scene.shake) this.scene.shake(120, 0.007);
+        else if (this.scene.cameras && this.scene.cameras.main) this.scene.cameras.main.shake(120, 0.007);
         if (window.audioManager) window.audioManager.play('hurt');
         return true;
     }

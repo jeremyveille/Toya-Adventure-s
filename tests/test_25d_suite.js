@@ -327,6 +327,77 @@ test("T1-FEAT", "reset clears cut bushes", () => {
     assert.deepStrictEqual(gm.cutBushes, [], "Reset must forget cut bushes");
 });
 
+// Groupe 1.4 : options audio (synthétiseur simulé, aucun navigateur requis).
+const audioSource = fs.readFileSync(path.join(rootDir, 'src/managers/AudioManager.js'), 'utf8');
+
+function makeAudioManager() {
+    const created = { oscillators: 0 };
+    class FakeGain {
+        constructor() {
+            this.gain = {
+                value: 1,
+                setValueAtTime() {},
+                exponentialRampToValueAtTime() {},
+                linearRampToValueAtTime() {}
+            };
+        }
+        connect() { return this; }
+        disconnect() {}
+    }
+    class FakeOscillator {
+        constructor() {
+            created.oscillators++;
+            this.type = 'sine';
+            this.frequency = { setValueAtTime() {}, exponentialRampToValueAtTime() {} };
+        }
+        connect() { return this; }
+        disconnect() {}
+        start() {}
+        stop() {}
+    }
+    const fakeWindow = {
+        AudioContext: class {
+            constructor() {
+                this.state = 'running';
+                this.currentTime = 0;
+                this.destination = {};
+            }
+            createGain() { return new FakeGain(); }
+            createOscillator() { return new FakeOscillator(); }
+            resume() {}
+        }
+    };
+    const AudioManager = new Function('window', 'localStorage', audioSource + '; return AudioManager;')(
+        fakeWindow, global.localStorage);
+    return { manager: new AudioManager(), created, fakeWindow };
+}
+
+test("T1-FEAT", "Audio mute toggles and is remembered on the device", () => {
+    const { manager } = makeAudioManager();
+    assert.strictEqual(manager.muted, false, "Sound is on by default");
+    assert.strictEqual(manager.toggleMute(), true, "First toggle mutes");
+    assert.strictEqual(global.localStorage.getItem("rpg_audio_muted"), "true");
+    assert.strictEqual(manager.toggleMute(), false, "Second toggle unmutes");
+    assert.strictEqual(global.localStorage.getItem("rpg_audio_muted"), "false");
+});
+
+test("T1-FEAT", "Muted audio allocates no oscillator", () => {
+    global.localStorage.setItem("rpg_audio_muted", "true");
+    const { manager, created } = makeAudioManager();
+    assert.strictEqual(manager.muted, true, "Saved preference is restored");
+    manager.play("hit");
+    assert.strictEqual(created.oscillators, 0, "No oscillator while muted");
+    manager.setMuted(false);
+    manager.play("hit");
+    assert.strictEqual(created.oscillators, 1, "Unmuting restores the sound");
+});
+
+test("T1-FEAT", "Unknown sound types release their nodes", () => {
+    const { manager, created } = makeAudioManager();
+    manager.play("inconnu");
+    assert.strictEqual(created.oscillators, 1, "The node is created then released");
+});
+
 test("T1-FEAT", "Inventory adds new distinct items", () => {
     const gm = new GameManager(GameConfig);
     gm.addItem({ id: "wood", name: "Bois", qty: 3 });
