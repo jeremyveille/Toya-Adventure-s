@@ -109,10 +109,25 @@ class GameManager {
         let existing = this.inventory.find(i => i.id === item.id);
         if(existing) {
             existing.qty += item.qty;
+            if (item.iconKey && !existing.iconKey) {
+                existing.iconKey = item.iconKey;
+            }
         } else {
             this.inventory.push({...item}); // Shallow copy to avoid reference mutation
         }
         this.save();
+    }
+
+    /**
+     * Checks if the inventory contains at least qty of an item
+     * @param {string} itemId 
+     * @param {number} qty 
+     * @returns {boolean}
+     */
+    hasItem(itemId, qty = 1) {
+        if (!itemId) return false;
+        const item = this.inventory.find(i => i.id === itemId);
+        return Boolean(item && item.qty >= qty);
     }
 
     /**

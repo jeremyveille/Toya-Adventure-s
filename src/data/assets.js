@@ -12,6 +12,7 @@ const ASSET_KEYS = {
     ITEM_BRIDGE: 'item_bridge',
     ITEM_COINS: 'item_coins',
     ITEM_SWORD_UPGRADE: 'item_sword_upgrade',
+    ITEM_TROPHY: 'item_trophy',
 
     // Environmental Props & Interactables
     PROP_TREE_LARGE: 'prop_tree_large',
@@ -126,6 +127,18 @@ const ASSET_MANIFEST = {
         scale: 1.0,
         name: 'Pierre à Aiguiser',
         desc: 'Augmente la puissance des attaques physiques.'
+    },
+    [ASSET_KEYS.ITEM_TROPHY]: {
+        key: ASSET_KEYS.ITEM_TROPHY,
+        path: 'assets/items/trophy.png',
+        category: 'item',
+        type: 'image',
+        width: 32,
+        height: 32,
+        anchor: { x: 0.5, y: 0.5 },
+        scale: 1.0,
+        name: 'Trophée Ancien',
+        desc: 'Relique glorieuse obtenue en terrassant le Gardien des Ruines.'
     },
 
     // ==========================================
@@ -493,6 +506,8 @@ const LEGACY_ALIASES = {
     'bridge': ASSET_KEYS.ITEM_BRIDGE,
     'coins': ASSET_KEYS.ITEM_COINS,
     'sword_upgrade': ASSET_KEYS.ITEM_SWORD_UPGRADE,
+    'trophy': ASSET_KEYS.ITEM_TROPHY,
+    'boss_trophy': ASSET_KEYS.ITEM_TROPHY,
 
     // Scene aliases
     'tiles': ASSET_KEYS.BATTLE_BG, // Heals BattleScene.js line 8 missing texture

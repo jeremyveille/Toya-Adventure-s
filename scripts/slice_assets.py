@@ -266,6 +266,54 @@ def generate_sword_upgrade(dest_path):
     atomic_save_png(img, dest_path)
 
 
+def generate_trophy(dest_path):
+    """Generate 32x32 clean pixel-art golden ancient trophy icon."""
+    img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    # Base stand
+    d.rectangle([9, 25, 22, 28], fill=(130, 85, 15, 255))
+    d.rectangle([10, 26, 21, 27], fill=(215, 165, 30, 255))
+    d.rectangle([11, 23, 20, 25], fill=(160, 110, 20, 255))
+    d.rectangle([12, 24, 19, 25], fill=(245, 200, 45, 255))
+
+    # Stem
+    d.rectangle([14, 18, 17, 23], fill=(160, 110, 20, 255))
+    d.rectangle([15, 18, 16, 22], fill=(255, 215, 60, 255))
+
+    # Handles (left and right)
+    d.ellipse([5, 8, 11, 17], outline=(140, 95, 15, 255), width=2)
+    d.ellipse([6, 9, 10, 16], fill=(0, 0, 0, 0))
+    d.ellipse([20, 8, 26, 17], outline=(140, 95, 15, 255), width=2)
+    d.ellipse([21, 9, 25, 16], fill=(0, 0, 0, 0))
+
+    # Outer cup silhouette
+    d.rectangle([8, 6, 23, 16], fill=(140, 95, 15, 255))
+    d.polygon([(8, 16), (23, 16), (18, 20), (13, 20)], fill=(140, 95, 15, 255))
+
+    # Inner cup fill
+    d.rectangle([9, 7, 22, 15], fill=(240, 185, 35, 255))
+    d.polygon([(9, 15), (22, 15), (17, 19), (14, 19)], fill=(215, 160, 25, 255))
+
+    # Rim at the top
+    d.ellipse([8, 5, 23, 8], fill=(255, 225, 75, 255), outline=(150, 105, 15, 255))
+    d.ellipse([10, 6, 21, 7], fill=(185, 130, 20, 255))
+
+    # Highlights and shading on cup
+    d.line([(10, 8), (10, 15)], fill=(255, 245, 150, 255), width=1)
+    d.line([(11, 8), (11, 15)], fill=(255, 230, 90, 255), width=1)
+    d.line([(21, 8), (21, 15)], fill=(180, 120, 15, 255), width=1)
+
+    # Inset blue gem in center of cup
+    d.rectangle([14, 11, 17, 14], fill=(30, 80, 200, 255))
+    d.point([(15, 12)], fill=(150, 210, 255, 255))
+
+    # Sparkle glint on rim
+    d.point([(9, 5), (10, 4), (11, 5), (10, 6)], fill=(255, 255, 255, 255))
+
+    atomic_save_png(img, dest_path)
+
+
 def generate_chest(dest_path, opened=False):
     """Generate 64x64 pixel-art treasure chest (closed or opened)."""
     img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
@@ -561,6 +609,7 @@ def run_pipeline():
     generate_bridge("assets/items/bridge.png")
     generate_coins("assets/items/coins.png")
     generate_sword_upgrade("assets/items/sword_upgrade.png")
+    generate_trophy("assets/items/trophy.png")
 
     # 5. Monsters & Variants
     print("\n--- Slicing Monsters & Boss Variants ---")

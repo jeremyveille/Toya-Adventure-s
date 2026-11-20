@@ -87,7 +87,7 @@ class WorldScene extends Phaser.Scene {
             }
         }
         if (_preloadAssets) {
-            _preloadAssets(this, ['character', 'prop', 'vfx', 'monster']);
+            _preloadAssets(this, ['character', 'prop', 'vfx', 'monster', 'item', 'ui']);
         }
     }
 
@@ -308,7 +308,7 @@ class WorldScene extends Phaser.Scene {
                 } else if (cell === 'R') {
                     this.createRuin(cx, cy, ts, false);
                 } else if (cell === 'r') {
-                    this.createRuin(cx, cy, ts, true);
+                    this.createResource(cx, cy, ts, 'rock');
                 } else if (cell === 'S') {
                     spawnX = cx;
                     spawnY = cy;
@@ -397,7 +397,11 @@ class WorldScene extends Phaser.Scene {
         });
 
         this.input.keyboard.on('keydown-E', () => {
+            if (!this.player || !this.player.active) return;
+            const hud = this.scene.get('HUDScene');
+            if (hud && (hud.isMenuActive || hud.isDialogueActive)) return;
             this.physics.overlap(this.player.interactionHitbox, this.interactiveZones, this.handleInteraction, null, this);
+            this.physics.overlap(this.player.interactionHitbox, this.resourceGroup, this.hitResource, null, this);
         });
 
         this.scene.launch('HUDScene');
@@ -594,14 +598,29 @@ class WorldScene extends Phaser.Scene {
     }
 
     createResource(cx, cy, ts, type) {
-        let zone = this.createWall(cx, cy + ts * 0.2, 28, 20);
-        let sprite = this.add.sprite(cx, cy + ts * 0.2, 'tex_bush');
-        sprite.setOrigin(0.5, 0.85);
-        sprite.setDepth(Math.floor(cy + ts * 0.2));
+        const isRock = (type === 'rock' || type === 'stone');
+        const wallW = isRock ? 32 : 28;
+        const wallH = 20;
+        let zone = this.createWall(cx, cy + ts * 0.2, wallW, wallH);
         
-        zone.resData = { type };
+        let textureKey = isRock
+            ? ((this.textures && typeof this.textures.exists === 'function' && this.textures.exists('prop_rock')) ? 'prop_rock' : 'tex_ruin_small')
+            : ((this.textures && typeof this.textures.exists === 'function' && this.textures.exists('prop_bush')) ? 'prop_bush' : 'tex_bush');
+            
+        let sprite = this.add.sprite(cx, cy + ts * 0.2, textureKey);
+        sprite.setOrigin(0.5, 0.85);
+        let baseDepth = Math.floor(cy + ts * 0.2);
+        sprite.setDepth(baseDepth);
+        
+        let shadow = this.add.sprite(cx, cy + ts * 0.2, 'tex_shadow');
+        shadow.setScale(isRock ? 1.1 : 1.0, 0.7);
+        shadow.setDepth(baseDepth - 0.5);
+        
+        zone.resData = { type, yields: isRock ? 'stone' : 'wood' };
         zone.sprite = sprite;
+        zone.shadow = shadow;
         this.resourceGroup.add(zone);
+        return zone;
     }
 
     createChest(cx, cy, ts, data) {
@@ -1179,28 +1198,37 @@ class WorldScene extends Phaser.Scene {
     }
 
     hitResource(weaponBox, resZone) {
-        if (resZone.isDestroyed) return;
+        if (!resZone || resZone.isDestroyed) return;
         resZone.isDestroyed = true;
         
         this.cameras.main.shake(50, 0.005);
         
+        const isRock = (resZone.resData && (resZone.resData.type === 'rock' || resZone.resData.type === 'stone' || resZone.resData.yields === 'stone'));
+        const itemId = isRock ? 'stone' : 'wood';
+        const itemName = isRock ? 'Pierre' : 'Bois';
+        const iconKey = isRock ? 'item_stone' : 'item_wood';
+        const particleColor = isRock ? 0x888888 : 0x4caf50;
+        
         for(let i=0; i<6; i++) {
-            let p = this.add.rectangle(resZone.x, resZone.y, 8, 8, 0x4caf50);
+            let p = this.add.rectangle(resZone.x, resZone.y, 8, 8, particleColor);
             p.setDepth(Math.floor(resZone.y) + 10);
             this.physics.add.existing(p);
             p.body.setVelocity(Phaser.Math.Between(-80,80), Phaser.Math.Between(-100,20));
             this.tweens.add({ targets: p, alpha: 0, duration: 600, onComplete: () => p.destroy() });
         }
         
-        let itemId = 'wood';
-        let itemName = 'Bois';
-        window.gameState.addItem({ id: itemId, name: itemName, qty: 1 });
+        window.gameState.addItem({ id: itemId, name: itemName, qty: 1, iconKey: iconKey });
         if (window.audioManager) window.audioManager.play('collect');
         
         let txt = this.add.text(resZone.x, resZone.y - 20, `+1 ${itemName}`, { fontSize: '10px', fontFamily: '"Press Start 2P"', color: '#ffffff', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5).setDepth(9002);
         this.tweens.add({ targets: txt, y: txt.y - 40, alpha: 0, duration: 1500, onComplete: () => txt.destroy() });
         
-        resZone.sprite.destroy();
+        if (resZone.shadow && typeof resZone.shadow.destroy === 'function') {
+            resZone.shadow.destroy();
+        }
+        if (resZone.sprite && typeof resZone.sprite.destroy === 'function') {
+            resZone.sprite.destroy();
+        }
         this.walls.remove(resZone);
         resZone.destroy();
     }

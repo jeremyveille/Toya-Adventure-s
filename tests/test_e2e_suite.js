@@ -539,6 +539,9 @@ test("T1-FEAT", "T1-FEAT-F7-01", "Harvestable Resource Node Registration", () =>
     const resources = harness.worldScene.resourceGroup.getChildren();
     assert.ok(resources.length > 0, "Resource group contains harvestable nodes");
     assert.strictEqual(resources[0].resData.type, 'bush');
+    const rockNode = resources.find(r => r.resData && r.resData.type === 'rock');
+    assert.ok(rockNode, "Stone rock node registered in resourceGroup");
+    assert.strictEqual(rockNode.resData.yields, 'stone', "Rock yields stone");
 });
 
 test("T1-FEAT", "T1-FEAT-F7-02", "Resource Node Destruction & Loot Drop", () => {
@@ -574,7 +577,9 @@ test("T1-FEAT", "T1-FEAT-F7-04", "HUDScene Inventory Visual Icon Integration", (
     harness.hudScene.toggleMenu("INVENTAIRE");
     assert.strictEqual(harness.hudScene.isMenuActive, true);
     assert.ok(harness.hudScene.menuContent.text.includes("Potion"), "Displays Potion text");
+    assert.strictEqual(harness.hudScene.itemIcons.length, 1, "Displays 1 icon for potion item");
     harness.hudScene.toggleMenu("INVENTAIRE");
+    assert.strictEqual(harness.hudScene.itemIcons.length, 0, "Icons cleared when menu closed");
 });
 
 test("T1-FEAT", "T1-FEAT-F7-05", "HUDScene Crafting Menu Recipes Display", () => {
@@ -583,7 +588,9 @@ test("T1-FEAT", "T1-FEAT-F7-05", "HUDScene Crafting Menu Recipes Display", () =>
     harness.hudScene.toggleMenu("CRAFTING");
     assert.ok(harness.hudScene.menuContent.text.includes("Pont en Bois"), "Displays Pont recipe");
     assert.ok(harness.hudScene.menuContent.text.includes("Potion"), "Displays Potion recipe");
+    assert.strictEqual(harness.hudScene.itemIcons.length, 4, "Displays 4 icons for recipes and ingredients (bridge, potion, wood, stone)");
     harness.hudScene.toggleMenu("CRAFTING");
+    assert.strictEqual(harness.hudScene.itemIcons.length, 0, "Icons cleared when menu closed");
 });
 
 // Feature 8: UI Controls & Keybinding Harmonization (F8-01 to F8-05)
@@ -617,10 +624,14 @@ test("T1-FEAT", "T1-FEAT-F8-03", "Keybinding K / C Toggles Crafting", () => {
     harness.worldScene.init({});
     harness.worldScene.create({});
     harness.hudScene.create();
-    harness.hudScene.toggleMenu("CRAFTING");
-    assert.strictEqual(harness.hudScene.isMenuActive, true, "CRAFTING menu opens");
+    harness.hudScene.kKey.setDown(true);
+    harness.hudScene.update();
+    assert.strictEqual(harness.hudScene.isMenuActive, true, "CRAFTING menu opens on K");
     assert.strictEqual(harness.hudScene.menuTitle.text, "CRAFTING", "Title is CRAFTING");
-    harness.hudScene.toggleMenu("CRAFTING");
+    harness.hudScene.kKey.reset();
+    harness.hudScene.kKey.setDown(true);
+    harness.hudScene.update();
+    assert.strictEqual(harness.hudScene.isMenuActive, false, "CRAFTING menu closes on second K");
 });
 
 test("T1-FEAT", "T1-FEAT-F8-04", "Keybinding C Character / Stats Modal", () => {
@@ -632,6 +643,15 @@ test("T1-FEAT", "T1-FEAT-F8-04", "Keybinding C Character / Stats Modal", () => {
     assert.strictEqual(stats.level, 1, "Player Level is 1");
     assert.strictEqual(stats.hp, 100, "Player HP is 100");
     assert.strictEqual(stats.gold, 0, "Player Gold is 0");
+    harness.hudScene.cKey.setDown(true);
+    harness.hudScene.update();
+    assert.strictEqual(harness.hudScene.isMenuActive, true, "PERSONNAGE menu opens on C");
+    assert.strictEqual(harness.hudScene.menuTitle.text, "PERSONNAGE", "Title is PERSONNAGE");
+    assert.ok(harness.hudScene.menuContent.text.includes("FICHE DU PERSONNAGE"), "Displays character sheet");
+    harness.hudScene.cKey.reset();
+    harness.hudScene.escKey.setDown(true);
+    harness.hudScene.update();
+    assert.strictEqual(harness.hudScene.isMenuActive, false, "Menu closed via Escape");
 });
 
 test("T1-FEAT", "T1-FEAT-F8-05", "Menu Pause/Resume of WorldScene", () => {
