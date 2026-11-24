@@ -12,7 +12,7 @@ class OcclusionManager {
                 minX: sprite.x - sprite.displayWidth * sprite.originX,
                 maxX: sprite.x + sprite.displayWidth * (1 - sprite.originX),
                 minY: sprite.y - sprite.displayHeight * sprite.originY,
-                maxY: sprite.y + sprite.displayHeight * (1 - sprite.originX)
+                maxY: sprite.y + sprite.displayHeight * (1 - sprite.originY)
             },
             targetAlpha,
             baseY: bY,
@@ -87,7 +87,7 @@ class WorldScene extends Phaser.Scene {
             }
         }
         if (_preloadAssets) {
-            _preloadAssets(this, ['character', 'prop', 'vfx', 'monster', 'item', 'ui']);
+            _preloadAssets(this, ['character', 'prop', 'vfx', 'monster', 'item', 'ui', 'terrain']);
         }
     }
 
@@ -111,20 +111,46 @@ class WorldScene extends Phaser.Scene {
         // Gestionnaire d'occlusion dynamique pour toits et feuillages
         this.occlusionManager = new OcclusionManager(this);
 
-        // 1. Génération des textures pixel-art volumétriques 2.5D
+        // 1. Génération des textures pixel-art volumétriques 2.5D (fallback si asset non chargé)
         this.generateTextures(ts);
 
-        let terrainGraphics = this.add.graphics();
-        terrainGraphics.setDepth(0);
-        let dirtGraphics = this.add.graphics();
-        dirtGraphics.setDepth(1);
-        let waterOverlapGraphics = this.add.graphics();
-        waterOverlapGraphics.setDepth(2);
+        // 1B. Système de découverte & zones de danger (MapDiscoverySystem)
+        const savedDiscovery = (typeof window !== 'undefined' && window.gameState) ? window.gameState.discoveryData : null;
+        if (typeof MapDiscoverySystem !== 'undefined') {
+            this.mapDiscovery = new MapDiscoverySystem(savedDiscovery);
+        } else {
+            this.mapDiscovery = null;
+        }
+        this.hasCrossedBridge = false;
+        this.hasHarvestedResource = false;
+
+        // 2. Rendu du terrain 2.5D via TerrainRenderer (tileset 64px ou fallback Graphics)
+        if (typeof TerrainRenderer !== 'undefined') {
+            this.terrainRenderer = new TerrainRenderer(this);
+            this.terrainRenderer.renderMap(
+                this.currentMapData,
+                this.targetMapName,
+                (cx, cy, w, h) => this.createWall(cx, cy, w, h),
+                (cx, cy, size) => this.createIndoorWall(cx, cy, size),
+                this.doorGroup
+            );
+        } else {
+            let terrainGraphics = this.add.graphics();
+            terrainGraphics.setDepth(0);
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const cell = layout[y][x];
+                    const px = x * ts, py = y * ts, cx = px + ts / 2, cy = py + ts / 2;
+                    if (cell === 'W') { this.createWall(cx, cy, ts); }
+                    else if (cell === 'w') { this.createIndoorWall(cx, cy, ts); }
+                }
+            }
+        }
         
         let spawnX = ts * 5 + ts/2, spawnY = ts * 3 + ts/2;
         let houseCells = [];
 
-        // 2. Rendu de la carte 2.5D
+        // 3. Placement des objets 2.5D, PNJ, ressources et ennemis (Depth Y-sorting unifié)
         for(let y = 0; y < height; y++) {
             for(let x = 0; x < width; x++) {
                 let cell = layout[y][x];
@@ -133,170 +159,6 @@ class WorldScene extends Phaser.Scene {
                 let cx = px + ts/2;
                 let cy = py + ts/2;
 
-                // --- Base Herbe et Sol ---
-                if (cell !== 'w' && cell !== 'f' && cell !== 'W' && cell !== 'B') {
-                    // Base Herbe riche et chaleureuse (Akira Toriyama fantasy style)
-                    terrainGraphics.fillStyle(0x5c9e2b);
-                    terrainGraphics.fillRect(px, py, ts, ts);
-                    
-                    // Touffes d'herbe et fleurs procédurales
-                    let rand = (x * 13 + y * 7) % 100;
-                    if (rand < 55) {
-                        terrainGraphics.fillStyle(0x46821a); // Touffes vert foncé
-                        terrainGraphics.fillRect(px + 8, py + 16, 8, 4);
-                        terrainGraphics.fillRect(px + 12, py + 12, 4, 4);
-                        terrainGraphics.fillRect(px + 40, py + 44, 12, 4);
-                        terrainGraphics.fillStyle(0x6eb532); // Reflet soleil
-                        terrainGraphics.fillRect(px + 8, py + 14, 4, 2);
-                    }
-                    if (rand < 18) { // Fleurs multicolores (marguerites, boutons d'or, coquelicots)
-                        let flowerColor = (rand % 3 === 0) ? 0xffffff : (rand % 3 === 1) ? 0xffd54f : 0xe74c3c;
-                        terrainGraphics.fillStyle(flowerColor);
-                        terrainGraphics.fillRect(px + 32, py + 24, 4, 4);
-                        terrainGraphics.fillStyle(0xfff176); // Centre
-                        terrainGraphics.fillRect(px + 32, py + 26, 4, 2);
-                    }
-                    if (rand > 80 && rand < 90) { // Petits cailloux de prairie
-                        terrainGraphics.fillStyle(0x78909c);
-                        terrainGraphics.fillRect(px + 20, py + 36, 6, 4);
-                        terrainGraphics.fillStyle(0xb0bec5);
-                        terrainGraphics.fillRect(px + 20, py + 34, 4, 2);
-                    }
-                }
-
-                // --- Eau encaissée (-20px) 2.5D ---
-                if (cell === 'W') {
-                    // Lit de rivière encaissé avec ombre de berge nord
-                    terrainGraphics.fillStyle(0x1a4b66); // Ombre de la berge nord
-                    terrainGraphics.fillRect(px, py, ts, ts);
-                    terrainGraphics.fillStyle(0x256588); // Corps de l'eau
-                    terrainGraphics.fillRect(px, py + 8, ts, ts - 8);
-                    
-                    // Vagues et reflets
-                    terrainGraphics.fillStyle(0xa8e6cf);
-                    terrainGraphics.fillRect(px + 12, py + 18, 20, 3);
-                    terrainGraphics.fillRect(px + 36, py + 42, 16, 3);
-                    terrainGraphics.fillStyle(0xffffff); // Reflet miroitant
-                    terrainGraphics.fillRect(px + 24, py + 20, 6, 2);
-                    
-                    // Mur bloquant l'eau
-                    this.createWall(cx, cy, ts);
-                }
-
-                // --- Pont en bois 2.5D surélevé avec garde-corps ---
-                if (cell === 'B') {
-                    // Eau sous le pont
-                    terrainGraphics.fillStyle(0x1a4b66);
-                    terrainGraphics.fillRect(px, py, ts, ts);
-                    terrainGraphics.fillStyle(0x256588);
-                    terrainGraphics.fillRect(px, py + 8, ts, ts - 8);
-
-                    // Tablier de pont en bois surélevé
-                    terrainGraphics.fillStyle(0x3e2723); // Ombre portée du tablier
-                    terrainGraphics.fillRect(px, py + 14, ts, ts - 16);
-                    terrainGraphics.fillStyle(0x8a6235); // Planches de chêne
-                    terrainGraphics.fillRect(px, py + 10, ts, ts - 20);
-                    
-                    // Lattes de bois et clous
-                    terrainGraphics.fillStyle(0x4e342e);
-                    terrainGraphics.fillRect(px, py + 18, ts, 2);
-                    terrainGraphics.fillRect(px, py + 32, ts, 2);
-                    terrainGraphics.fillRect(px, py + 46, ts, 2);
-
-                    // Garde-corps latéraux
-                    let isWestEdge = x > 0 && layout[y][x - 1] === 'W';
-                    let isEastEdge = x < width - 1 && layout[y][x + 1] === 'W';
-
-                    if (isWestEdge) {
-                        let gRailingW = this.add.graphics();
-                        gRailingW.fillStyle(0x4a2e1b);
-                        gRailingW.fillRect(px + 2, py + 4, 6, ts - 8);
-                        gRailingW.fillStyle(0x8a6235);
-                        gRailingW.fillRect(px + 1, py + 2, 8, 4);
-                        gRailingW.setDepth(Math.floor(cy + ts * 0.5));
-                        this.createWall(px + 4, cy, 8, ts);
-                    }
-                    if (isEastEdge) {
-                        let gRailingE = this.add.graphics();
-                        gRailingE.fillStyle(0x4a2e1b);
-                        gRailingE.fillRect(px + ts - 8, py + 4, 6, ts - 8);
-                        gRailingE.fillStyle(0x8a6235);
-                        gRailingE.fillRect(px + ts - 9, py + 2, 8, 4);
-                        gRailingE.setDepth(Math.floor(cy + ts * 0.5));
-                        this.createWall(px + ts - 4, cy, 8, ts);
-                    }
-                }
-
-                // --- Intérieur (House 1) ---
-                if (cell === 'f' || cell === 'w') {
-                    terrainGraphics.fillStyle(0x151515);
-                    terrainGraphics.fillRect(px, py, ts, ts);
-                    if (cell === 'f') {
-                        // Parquet en bois intérieur
-                        dirtGraphics.fillStyle(0x8a6b4e);
-                        dirtGraphics.fillRect(px + 4, py + 4, ts - 8, ts - 8);
-                        dirtGraphics.fillStyle(0x6d4c41);
-                        dirtGraphics.fillRect(px + 4, py + ts/2, ts - 8, 2);
-
-                        // Enregistrement de la porte de sortie de House 1 vers Village
-                        if (this.targetMapName === "House1" && y === height - 1) {
-                            let doorData = (this.currentMapData.doorsData && this.currentMapData.doorsData["f_door"])
-                                ? this.currentMapData.doorsData["f_door"]
-                                : { targetMap: "Village", targetSpawn: { x: 35, y: 5 } };
-                            let exitZone = this.add.zone(cx, cy, ts, ts);
-                            this.physics.add.existing(exitZone, true);
-                            exitZone.doorData = doorData;
-                            this.doorGroup.add(exitZone);
-
-                            let doorStep = this.add.graphics();
-                            doorStep.fillStyle(0x5e3a1f);
-                            doorStep.fillRect(px + 8, py + ts - 12, ts - 16, 10);
-                            doorStep.setDepth(3);
-                        }
-                    } else if (cell === 'w') {
-                        this.createIndoorWall(cx, cy, ts);
-                    }
-                }
-
-                // --- Chemin de terre et auto-tiling organique ---
-                if (cell === 'd') {
-                    dirtGraphics.fillStyle(0xc49a62); // Terre battue
-                    dirtGraphics.fillRect(px, py, ts, ts);
-                    
-                    // Gravillons et ornières
-                    dirtGraphics.fillStyle(0xa37b4a);
-                    dirtGraphics.fillRect(px + 16, py + 16, 4, 4);
-                    dirtGraphics.fillRect(px + 44, py + 32, 6, 4);
-                    dirtGraphics.fillStyle(0xdeb887);
-                    dirtGraphics.fillRect(px + 28, py + 48, 8, 4);
-
-                    // Bords herbeux organiques
-                    let top = y > 0 ? layout[y-1][x] : null;
-                    let bottom = y < height-1 ? layout[y+1][x] : null;
-                    let left = x > 0 ? layout[y][x-1] : null;
-                    let right = x < width-1 ? layout[y][x+1] : null;
-
-                    dirtGraphics.fillStyle(0x5c9e2b);
-                    if (top !== 'd') {
-                        dirtGraphics.fillRect(px, py, ts, 8);
-                        dirtGraphics.fillRect(px + 12, py + 8, 16, 8);
-                        dirtGraphics.fillRect(px + 40, py + 8, 8, 4);
-                    }
-                    if (bottom !== 'd') {
-                        dirtGraphics.fillRect(px, py + ts - 8, ts, 8);
-                        dirtGraphics.fillRect(px + 20, py + ts - 16, 12, 8);
-                    }
-                    if (left !== 'd') {
-                        dirtGraphics.fillRect(px, py, 8, ts);
-                        dirtGraphics.fillRect(px + 8, py + 24, 8, 16);
-                    }
-                    if (right !== 'd') {
-                        dirtGraphics.fillRect(px + ts - 8, py, 8, ts);
-                        dirtGraphics.fillRect(px + ts - 16, py + 16, 8, 12);
-                    }
-                }
-
-                // --- OBJETS 2.5D (Depth Y-sorting unifié) ---
                 if (cell === 'T') {
                     this.createTree(cx, cy, ts, false);
                 } else if (cell === 't') {
@@ -330,6 +192,29 @@ class WorldScene extends Phaser.Scene {
             }
         }
 
+        // Ressources supplémentaires définies par métadonnées (ex: Herbe Médicinale)
+        if (Array.isArray(this.currentMapData.extraResources)) {
+            this.currentMapData.extraResources.forEach(res => {
+                const rcx = res.tileX * ts + ts / 2;
+                const rcy = res.tileY * ts + ts / 2;
+                this.createResource(rcx, rcy, ts, res.type || 'herb');
+            });
+        }
+
+        // Détails floraux décoratifs (sans collision) pour enrichir la prairie
+        if (this.targetMapName === "Village" && this.textures && typeof this.textures.exists === 'function' && this.textures.exists('prop_flower_patch')) {
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    if (layout[y][x] === '.' && ((x * 29 + y * 17) % 37 === 0)) {
+                        const fl = this.add.sprite(x * ts + ts / 2, y * ts + ts * 0.65, 'prop_flower_patch');
+                        fl.setOrigin(0.5, 0.85);
+                        fl.setScale(0.55);
+                        fl.setDepth(2.5);
+                    }
+                }
+            }
+        }
+
         // Bâtiments 2.5D en volume avec toits praticables et occlusion
         this.buildHouses(houseCells, ts);
 
@@ -341,14 +226,14 @@ class WorldScene extends Phaser.Scene {
         this.player = new Player(this, spawnX, spawnY, 'hero');
         this.player.setDepth(Math.floor(this.player.y));
         
-        // Ombre portée sous les pieds du joueur
+        // Ombre portée douce sous les pieds du joueur
         this.playerShadow = this.add.sprite(this.player.x, this.player.y, 'tex_shadow');
-        this.playerShadow.setScale(1.6, 1.0);
+        this.playerShadow.setScale(0.75, 0.55);
         this.playerShadow.setDepth(Math.floor(this.player.y) - 0.5);
 
-        // --- AMBIANCE & POST-PROCESSING 2.5D ---
-        let overlayColor = this.targetMapName === "House1" ? 0x000000 : 0xdc9233;
-        let overlayAlpha = this.targetMapName === "House1" ? 0.3 : 0.15;
+        // --- AMBIANCE & POST-PROCESSING 2.5D (léger pour garder des couleurs vives) ---
+        let overlayColor = this.targetMapName === "House1" ? 0x000000 : 0xffc864;
+        let overlayAlpha = this.targetMapName === "House1" ? 0.25 : 0.05;
         let overlay = this.add.rectangle(0, 0, width * ts, height * ts, overlayColor, overlayAlpha).setOrigin(0,0);
         overlay.setBlendMode(this.targetMapName === "House1" ? Phaser.BlendModes.NORMAL : Phaser.BlendModes.ADD);
         overlay.setDepth(9000);
@@ -380,6 +265,7 @@ class WorldScene extends Phaser.Scene {
         this.physics.add.collider(this.enemies, this.walls);
         this.physics.add.overlap(this.player.weaponHitbox, this.enemies, this.hitMinorEnemy, null, this);
         this.physics.add.overlap(this.player.weaponHitbox, this.resourceGroup, this.hitResource, null, this);
+        this.physics.add.overlap(this.player, this.enemies, this.handleEnemyContact, null, this);
         this.physics.add.overlap(this.player, this.doorGroup, this.enterDoor, null, this);
         this.physics.add.overlap(this.player, this.bossGroup, this.startBossBattle, null, this);
 
@@ -391,21 +277,93 @@ class WorldScene extends Phaser.Scene {
             }
         }
 
+        // Attachement de l'InputManager centralisé (Clavier / Souris / Manette)
+        if (typeof window !== 'undefined' && window.inputManager && typeof window.inputManager.attachScene === 'function') {
+            window.inputManager.attachScene(this);
+        }
+
+        // Après victoire contre un ennemi sauvage : révéler le point d'intérêt des ruines (étape 8 du tutoriel)
+        this.events.on('EnemyDefeated', () => {
+            if (this.targetMapName === 'Village' && this.mapDiscovery && Array.isArray(this.currentMapData.landmarks)) {
+                const ruinsLm = this.currentMapData.landmarks.find(l => l.id === 'ancient_ruins');
+                if (ruinsLm) {
+                    const discovered = this.mapDiscovery.discoverLandmark(this.targetMapName, ruinsLm);
+                    if (discovered) {
+                        this._syncDiscoveryPersistence();
+                        this.events.emit('DiscoveryBanner', `Lieu révélé : ${discovered.name}`, '#ffd54f');
+                    }
+                }
+            }
+        });
+
         this.events.on('wake', () => {
             this.isBossBattleTriggered = false;
             this.cameras.main.fadeIn(500, 255, 255, 255);
         });
 
         this.input.keyboard.on('keydown-E', () => {
-            if (!this.player || !this.player.active) return;
-            const hud = this.scene.get('HUDScene');
-            if (hud && (hud.isMenuActive || hud.isDialogueActive)) return;
-            this.physics.overlap(this.player.interactionHitbox, this.interactiveZones, this.handleInteraction, null, this);
-            this.physics.overlap(this.player.interactionHitbox, this.resourceGroup, this.hitResource, null, this);
+            this.triggerContextInteraction();
         });
 
         this.scene.launch('HUDScene');
         if (this.targetMapName === "Village") this.setupTutorial();
+        this.updateDiscovery();
+    }
+
+    triggerContextInteraction() {
+        if (!this.player || !this.player.active) return;
+        const hud = this.scene.get('HUDScene');
+        if (hud && (hud.isMenuActive || hud.isDialogueActive)) return;
+        this.physics.overlap(this.player.interactionHitbox, this.interactiveZones, this.handleInteraction, null, this);
+        this.physics.overlap(this.player.interactionHitbox, this.resourceGroup, this.hitResource, null, this);
+    }
+
+    handleEnemyContact(player, enemy) {
+        if (!player || !player.active || !enemy || enemy.isDead || !enemy.active) return;
+        if (enemy.isLunging && typeof player.takeDamage === 'function') {
+            player.takeDamage(enemy.contactDamage || 10, enemy.x, enemy.y);
+        }
+    }
+
+    _syncDiscoveryPersistence() {
+        if (this.mapDiscovery && typeof window !== 'undefined' && window.gameState) {
+            window.gameState.discoveryData = this.mapDiscovery.serialize();
+            if (typeof window.gameState.save === 'function') {
+                window.gameState.save();
+            }
+        }
+    }
+
+    updateDiscovery() {
+        if (!this.mapDiscovery || !this.player || !this.currentMapData) return;
+        const result = this.mapDiscovery.updatePlayerPosition(
+            this.targetMapName,
+            this.currentMapData,
+            this.player.x,
+            this.player.y
+        );
+        if (result.newlyDiscovered.length > 0) {
+            this._syncDiscoveryPersistence();
+            result.newlyDiscovered.forEach(lm => {
+                this.events.emit('DiscoveryBanner', `Découverte : ${lm.name}`, '#ffd54f');
+                if (typeof window !== 'undefined' && window.audioManager && window.audioManager.play) {
+                    window.audioManager.play('collect');
+                }
+                if (typeof window !== 'undefined' && window.announce) {
+                    window.announce(`Lieu découvert : ${lm.name}`);
+                }
+            });
+        }
+        if (result.zoneChanged) {
+            this.events.emit('ZoneChanged', result.zoneChanged);
+            if (result.zoneChanged.dangerLevel === 'wild') {
+                this.hasCrossedBridge = true;
+                this.events.emit('DiscoveryBanner', `${result.zoneChanged.zoneName} (${result.zoneChanged.dangerLabel})`, result.zoneChanged.color);
+                if (typeof window !== 'undefined' && window.announce) {
+                    window.announce(`Entrée dans ${result.zoneChanged.zoneName}, ${result.zoneChanged.dangerLabel}`);
+                }
+            }
+        }
     }
 
     createWall(cx, cy, width, height = width) {
@@ -421,7 +379,7 @@ class WorldScene extends Phaser.Scene {
         let baseDepth = Math.floor(cy + ts * 0.2);
         sprite.setDepth(baseDepth);
         let shadow = this.add.sprite(cx, cy + ts * 0.2, 'tex_shadow');
-        shadow.setScale(1.2, 0.8);
+        shadow.setScale(0.75, 0.55);
         shadow.setDepth(baseDepth - 0.5);
         return sprite;
     }
@@ -440,7 +398,7 @@ class WorldScene extends Phaser.Scene {
             
             // Ombre au sol sous le tronc
             let shadow = this.add.sprite(cx, trunkBaseY, 'tex_shadow');
-            shadow.setScale(2.4, 1.4);
+            shadow.setScale(1.6, 1.0);
             shadow.setDepth(baseDepth - 0.5);
 
             // Enregistrement de la canopée dans l'OcclusionManager
@@ -468,7 +426,7 @@ class WorldScene extends Phaser.Scene {
             tree.setDepth(baseDepth);
 
             let shadow = this.add.sprite(cx, trunkBaseY, 'tex_shadow');
-            shadow.setScale(1.5, 1.0);
+            shadow.setScale(1.05, 0.75);
             shadow.setDepth(baseDepth - 0.5);
 
             if (this.occlusionManager) {
@@ -528,13 +486,14 @@ class WorldScene extends Phaser.Scene {
         this.createWall(cx, cy + ts * 0.2, 28, 20);
         let baseDepth = Math.floor(cy + ts * 0.25);
         let shadow = this.add.sprite(cx, cy + ts * 0.25, 'tex_shadow');
-        shadow.setScale(1.2, 0.8);
+        shadow.setScale(0.75, 0.55);
         shadow.setDepth(baseDepth - 0.5);
 
         let textureKey = (data && (data.texture || data.key)) || 
                          (data && (data.name === 'Elder' || data.name === 'Ancien' || data.id === 'npc_elder') ? 'npc_elder' : 'npc_guide');
         let sprite = this.add.sprite(cx, cy + ts * 0.25, textureKey);
         sprite.setOrigin(0.5, 0.90);
+        sprite.setScale(0.84);
         sprite.setDepth(baseDepth);
         
         let indicator = this.add.text(cx, cy - ts * 0.6, "!", {
@@ -563,7 +522,7 @@ class WorldScene extends Phaser.Scene {
         }
         let enemy = new Enemy(this, cx, cy, tex, type);
         let shadow = this.add.sprite(cx, cy, 'tex_shadow');
-        shadow.setScale(1.6, 1.0);
+        shadow.setScale(0.95, 0.65);
         shadow.setDepth(Math.floor(cy) - 0.5);
         enemy.shadow = shadow;
         this.enemies.add(enemy);
@@ -599,13 +558,19 @@ class WorldScene extends Phaser.Scene {
 
     createResource(cx, cy, ts, type) {
         const isRock = (type === 'rock' || type === 'stone');
-        const wallW = isRock ? 32 : 28;
-        const wallH = 20;
+        const isHerb = (type === 'herb' || type === 'plant');
+        const wallW = isRock ? 32 : (isHerb ? 24 : 28);
+        const wallH = isHerb ? 16 : 20;
         let zone = this.createWall(cx, cy + ts * 0.2, wallW, wallH);
         
-        let textureKey = isRock
-            ? ((this.textures && typeof this.textures.exists === 'function' && this.textures.exists('prop_rock')) ? 'prop_rock' : 'tex_ruin_small')
-            : ((this.textures && typeof this.textures.exists === 'function' && this.textures.exists('prop_bush')) ? 'prop_bush' : 'tex_bush');
+        let textureKey;
+        if (isRock) {
+            textureKey = (this.textures && typeof this.textures.exists === 'function' && this.textures.exists('prop_rock')) ? 'prop_rock' : 'tex_ruin_small';
+        } else if (isHerb) {
+            textureKey = (this.textures && typeof this.textures.exists === 'function' && this.textures.exists('prop_herb_patch')) ? 'prop_herb_patch' : 'tex_herb';
+        } else {
+            textureKey = (this.textures && typeof this.textures.exists === 'function' && this.textures.exists('prop_bush')) ? 'prop_bush' : 'tex_bush';
+        }
             
         let sprite = this.add.sprite(cx, cy + ts * 0.2, textureKey);
         sprite.setOrigin(0.5, 0.85);
@@ -613,10 +578,11 @@ class WorldScene extends Phaser.Scene {
         sprite.setDepth(baseDepth);
         
         let shadow = this.add.sprite(cx, cy + ts * 0.2, 'tex_shadow');
-        shadow.setScale(isRock ? 1.1 : 1.0, 0.7);
+        shadow.setScale(isRock ? 1.1 : (isHerb ? 0.9 : 1.0), 0.7);
         shadow.setDepth(baseDepth - 0.5);
         
-        zone.resData = { type, yields: isRock ? 'stone' : 'wood' };
+        const yields = isRock ? 'stone' : (isHerb ? 'herb' : 'wood');
+        zone.resData = { type, yields };
         zone.sprite = sprite;
         zone.shadow = shadow;
         this.resourceGroup.add(zone);
@@ -631,7 +597,7 @@ class WorldScene extends Phaser.Scene {
         sprite.setDepth(baseDepth);
 
         let shadow = this.add.sprite(cx, cy + ts * 0.2, 'tex_shadow');
-        shadow.setScale(1.2, 0.8);
+        shadow.setScale(0.75, 0.55);
         shadow.setDepth(baseDepth - 0.5);
 
         let zone = this.add.zone(cx, cy, ts * 1.2, ts * 1.2);
@@ -1050,12 +1016,34 @@ class WorldScene extends Phaser.Scene {
             gWall.fillRect(0, 36, ts, 2);
             gWall.generateTexture('tex_wall', ts, ts);
         }
+
+        // --- 15. Herbe Médicinale 2.5D fallback (tex_herb) ---
+        if (!this.textures.exists('tex_herb')) {
+            let gHerb = this.make.graphics({x:0, y:0, add:false});
+            gHerb.fillStyle(0x1b431b);
+            gHerb.fillCircle(32, 38, 16);
+            gHerb.fillStyle(0x43a047);
+            gHerb.fillCircle(32, 34, 13);
+            gHerb.fillStyle(0xffe066);
+            gHerb.fillRect(24, 22, 4, 4);
+            gHerb.fillRect(32, 18, 4, 4);
+            gHerb.fillRect(38, 24, 4, 4);
+            gHerb.generateTexture('tex_herb', ts, ts);
+        }
     }
 
     handleInteraction(playerHitbox, interactiveZone) {
         if(interactiveZone.npcData) {
             let npc = interactiveZone.npcData;
-            this.events.emit('StartDialogue', npc.name, npc.dialogue, () => {});
+            let dialogueText = npc.dialogue;
+            // Adapter les indications de touches dans le dialogue du Guide au périphérique actif
+            if (npc.id === 'npc1' && typeof window !== 'undefined' && window.inputManager) {
+                const im = window.inputManager;
+                const attackPrompt = im.getPrompt('ATTACK', 'Récolter / Attaquer');
+                const craftPrompt = im.getPrompt('CRAFT', 'Artisanat');
+                dialogueText = `Bienvenue à Toya.\nRécolte un buisson ou une herbe proche (${attackPrompt}).\nFabrique un outil (${craftPrompt}), puis traverse le pont vers les Terres Sauvages !`;
+            }
+            this.events.emit('StartDialogue', npc.name, dialogueText, () => {});
             if (window.gameState && window.gameState.completeQuestGoal) {
                 window.gameState.completeQuestGoal('talk', npc.id);
             }
@@ -1071,6 +1059,9 @@ class WorldScene extends Phaser.Scene {
                 txt.setDepth(9002);
                 this.tweens.add({ targets: txt, y: txt.y - 50, alpha: 0, duration: 2000, onComplete: () => txt.destroy() });
                 if (window.audioManager) window.audioManager.play('collect');
+                if (typeof window !== 'undefined' && window.inputManager && typeof window.inputManager.vibrate === 'function') {
+                    window.inputManager.vibrate('light');
+                }
             }
         }
     }
@@ -1086,6 +1077,16 @@ class WorldScene extends Phaser.Scene {
                 this.time.delayedCall(3000, () => window.location.reload());
             }
             return;
+        }
+
+        const im = (typeof window !== 'undefined' && window.inputManager) ? window.inputManager : null;
+        if (im && typeof im.update === 'function') {
+            im.update();
+        }
+
+        // Interaction manette (A/Croix) ou clic droit contextuel
+        if (im && (im.justDown('INTERACT') || im.justDown('SECONDARY_ACTION'))) {
+            this.triggerContextInteraction();
         }
 
         this.player.update();
@@ -1127,53 +1128,143 @@ class WorldScene extends Phaser.Scene {
             this.occlusionManager.update(this.player);
         }
 
+        // Découverte de landmarks & zones de danger + prompt contextuel discret
+        this.updateDiscovery();
+        this.updateContextPrompt();
+
         if (this.targetMapName === "Village") {
             this.updateTutorial();
+        }
+
+        if (im && typeof im.endFrame === 'function') {
+            im.endFrame();
+        }
+    }
+
+    updateContextPrompt() {
+        if (!this.player || !this.player.active) {
+            this.events.emit('PromptUpdate', '');
+            return;
+        }
+        const im = (typeof window !== 'undefined' && window.inputManager) ? window.inputManager : null;
+        const promptFor = (action, verb) => im ? im.getPrompt(action, verb) : `[E] ${verb}`;
+        let bestText = '';
+        let bestDist = 92;
+
+        const zones = this.interactiveZones ? this.interactiveZones.getChildren() : [];
+        for (let i = 0; i < zones.length; i++) {
+            const z = zones[i];
+            if (!z || !z.active) continue;
+            const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, z.x, z.y);
+            if (d < bestDist) {
+                if (z.npcData) {
+                    bestDist = d;
+                    bestText = promptFor('INTERACT', `Parler à ${z.npcData.name}`);
+                } else if (z.chestData && !z.chestData.opened) {
+                    bestDist = d;
+                    bestText = promptFor('INTERACT', 'Ouvrir le coffre');
+                }
+            }
+        }
+
+        if (!bestText && this.resourceGroup) {
+            const resources = this.resourceGroup.getChildren();
+            for (let i = 0; i < resources.length; i++) {
+                const r = resources[i];
+                if (!r || !r.active || r.isDestroyed) continue;
+                const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, r.x, r.y);
+                if (d < 78) {
+                    const label = r.resData && r.resData.yields === 'herb'
+                        ? 'Cueillir Herbe'
+                        : (r.resData && r.resData.yields === 'stone' ? 'Miner Pierre' : 'Récolter Bois');
+                    bestText = promptFor('INTERACT', label);
+                    break;
+                }
+            }
+        }
+
+        if (bestText !== this._lastContextPrompt) {
+            this._lastContextPrompt = bestText;
+            this.events.emit('PromptUpdate', bestText);
         }
     }
 
     setupTutorial() {
         this.tutorialTexts = [];
         const ts = this.currentMapData.tileSize;
+        const im = (typeof window !== 'undefined' && window.inputManager) ? window.inputManager : null;
+        const fmt = (fn) => fn(im);
         
-        const addTutorialText = (x, y, text) => {
-            let t = this.add.text(x * ts + ts/2, y * ts, text, {
-                fontSize: '10px',
+        const addTutorialText = (x, y, textFactory) => {
+            const initialText = typeof textFactory === 'function' ? fmt(textFactory) : textFactory;
+            let t = this.add.text(x * ts + ts/2, y * ts, initialText, {
+                fontSize: '8px',
                 fontFamily: '"Press Start 2P"',
-                color: '#ffffff',
-                backgroundColor: '#000000cc',
-                padding: { x: 8, y: 8 },
+                color: '#ffe57f',
+                backgroundColor: '#0c151cb8',
+                padding: { x: 6, y: 4 },
                 align: 'center',
                 stroke: '#000',
                 strokeThickness: 2
             }).setOrigin(0.5).setAlpha(0);
             t.setDepth(9002);
-            this.tutorialTexts.push({ obj: t, triggerX: x * ts + ts/2, triggerY: y * ts + ts/2, active: false, done: false, condition: null });
+            this.tutorialTexts.push({
+                obj: t,
+                textFactory: typeof textFactory === 'function' ? textFactory : () => textFactory,
+                triggerX: x * ts + ts/2,
+                triggerY: y * ts + ts/2,
+                active: false,
+                done: false,
+                condition: null
+            });
             return t;
         };
 
-        let t1 = addTutorialText(5, 4.5, "Déplace-toi avec\nZQSD ou Flèches");
+        // 1. Déplacement naturel
+        addTutorialText(5, 4.2, (m) => m && m.inputMode === 'gamepad'
+            ? "Stick Gauche / D-Pad : Bouger"
+            : "ZQSD / Flèches : Bouger");
         this.tutorialTexts[0].condition = () => this.player.body.velocity.length() > 0;
         this.tutorialTexts[0].active = true;
         this.tutorialTexts[0].obj.setAlpha(1);
 
-        let t2 = addTutorialText(10, 8.5, "[E] Interagir");
+        // 2. Interaction avec le Guide (placé juste au-dessus du PNJ, sans masquer le chemin)
+        addTutorialText(10, 6.2, (m) => m ? m.getPrompt('INTERACT', 'Parler') : "[E] Parler");
         this.tutorialTexts[1].triggerDist = 150;
         this.tutorialTexts[1].condition = () => this.scene.get('HUDScene').isDialogueActive;
 
-        let t3 = addTutorialText(10, 13.5, "[Espace] Couper");
-        this.tutorialTexts[2].triggerDist = 150;
-        this.tutorialTexts[2].condition = () => this.player.isAttacking;
+        // 3. Récolte (buisson ou herbe)
+        addTutorialText(10, 13.5, (m) => m ? `${m.getPrompt('ATTACK', 'Récolter')}` : "[Espace] Récolter");
+        this.tutorialTexts[2].triggerDist = 160;
+        this.tutorialTexts[2].condition = () => this.hasHarvestedResource || this.player.isAttacking;
 
-        let t4 = addTutorialText(10, 19.5, "Combat!\n[Espace] Attaquer\n[1] Potion");
+        // 4. Transition Pont -> Zone Sauvage & Combat lisible
+        addTutorialText(10, 19.5, (m) => m
+            ? `Zone Sauvage !\n${m.getPrompt('ATTACK', 'Attaquer')}`
+            : "Zone Sauvage !\n[Espace] Attaquer");
         this.tutorialTexts[3].triggerDist = 250;
         this.tutorialTexts[3].condition = () => window.gameState.player.hp < window.gameState.player.maxHp || this.enemies.countActive() === 0;
+
+        // 5. Craft contextuel & Carte (apparaît doucement une fois au moins 1 ressource récoltée près du pont)
+        addTutorialText(27.5, 14, (m) => m
+            ? `${m.getPrompt('CRAFT', 'Artisanat')}  ${m.getPrompt('MAP', 'Carte')}`
+            : "[K] Artisanat  [M] Carte");
+        this.tutorialTexts[4].triggerDist = 180;
+        this.tutorialTexts[4].condition = () => this.hasCrossedBridge;
     }
 
     updateTutorial() {
         if (!this.tutorialTexts) return;
+        const im = (typeof window !== 'undefined' && window.inputManager) ? window.inputManager : null;
+        const currentMode = im ? im.inputMode : 'keyboardMouse';
+        const modeChanged = currentMode !== this._lastTutorialInputMode;
+        this._lastTutorialInputMode = currentMode;
+
         this.tutorialTexts.forEach(step => {
             if (step.done) return;
+            if (modeChanged && step.textFactory && step.obj && typeof step.obj.setText === 'function') {
+                step.obj.setText(step.textFactory(im));
+            }
             if (!step.active && step.triggerDist) {
                 let dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, step.triggerX, step.triggerY);
                 if (dist < step.triggerDist) {
@@ -1194,20 +1285,28 @@ class WorldScene extends Phaser.Scene {
             enemy.takeDamage(dmg);
             this.cameras.main.shake(100, 0.005);
             if (window.audioManager) window.audioManager.play('hit');
+            if (typeof window !== 'undefined' && window.inputManager && typeof window.inputManager.vibrate === 'function') {
+                window.inputManager.vibrate('light');
+            }
         }
     }
 
     hitResource(weaponBox, resZone) {
         if (!resZone || resZone.isDestroyed) return;
         resZone.isDestroyed = true;
+        this.hasHarvestedResource = true;
         
         this.cameras.main.shake(50, 0.005);
         
         const isRock = (resZone.resData && (resZone.resData.type === 'rock' || resZone.resData.type === 'stone' || resZone.resData.yields === 'stone'));
-        const itemId = isRock ? 'stone' : 'wood';
-        const itemName = isRock ? 'Pierre' : 'Bois';
-        const iconKey = isRock ? 'item_stone' : 'item_wood';
-        const particleColor = isRock ? 0x888888 : 0x4caf50;
+        const isHerb = (resZone.resData && (resZone.resData.type === 'herb' || resZone.resData.type === 'plant' || resZone.resData.yields === 'herb'));
+        const itemId = isRock ? 'stone' : (isHerb ? 'herb' : 'wood');
+        const itemName = isRock ? 'Pierre' : (isHerb ? 'Herbe Médicinale' : 'Bois');
+        const iconKey = isRock ? 'item_stone' : (isHerb ? 'item_herb' : 'item_wood');
+        const particleColor = isRock ? 0x888888 : (isHerb ? 0xffe066 : 0x4caf50);
+        const qty = (window.gameState && typeof window.gameState.getHarvestYield === 'function')
+            ? window.gameState.getHarvestYield(itemId)
+            : 1;
         
         for(let i=0; i<6; i++) {
             let p = this.add.rectangle(resZone.x, resZone.y, 8, 8, particleColor);
@@ -1217,10 +1316,13 @@ class WorldScene extends Phaser.Scene {
             this.tweens.add({ targets: p, alpha: 0, duration: 600, onComplete: () => p.destroy() });
         }
         
-        window.gameState.addItem({ id: itemId, name: itemName, qty: 1, iconKey: iconKey });
+        window.gameState.addItem({ id: itemId, name: itemName, qty: qty, iconKey: iconKey });
         if (window.audioManager) window.audioManager.play('collect');
+        if (typeof window !== 'undefined' && window.inputManager && typeof window.inputManager.vibrate === 'function') {
+            window.inputManager.vibrate('light');
+        }
         
-        let txt = this.add.text(resZone.x, resZone.y - 20, `+1 ${itemName}`, { fontSize: '10px', fontFamily: '"Press Start 2P"', color: '#ffffff', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5).setDepth(9002);
+        let txt = this.add.text(resZone.x, resZone.y - 20, `+${qty} ${itemName}`, { fontSize: '10px', fontFamily: '"Press Start 2P"', color: '#ffffff', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5).setDepth(9002);
         this.tweens.add({ targets: txt, y: txt.y - 40, alpha: 0, duration: 1500, onComplete: () => txt.destroy() });
         
         if (resZone.shadow && typeof resZone.shadow.destroy === 'function') {
