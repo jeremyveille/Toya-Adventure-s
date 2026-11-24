@@ -1,6 +1,26 @@
 const MapsData = {
     "Village": {
         tileSize: 64,
+        dangerLevel: "peaceful",
+        biome: "meadow",
+        wildStartRow: 17,
+        zones: [
+            { id: "village_meadow", name: "Clairière du Village", dangerLevel: "peaceful", minY: 0, maxY: 14 },
+            { id: "frontier_bridge", name: "Pont des Frontières", dangerLevel: "peaceful", minY: 15, maxY: 16 },
+            { id: "wild_south", name: "Terres Sauvages", dangerLevel: "wild", minY: 17, maxY: 24 }
+        ],
+        landmarks: [
+            { id: "village_square", name: "Clairière du Guide", type: "landmark", tileX: 10, tileY: 7, radius: 192, zone: "peaceful" },
+            { id: "village_cottage", name: "Chalet du Village", type: "building", tileX: 36, tileY: 4, radius: 200, zone: "peaceful" },
+            { id: "frontier_bridge_lm", name: "Pont des Frontières", type: "transition", tileX: 27.5, tileY: 15.5, radius: 180, zone: "wild" },
+            { id: "wild_cache", name: "Cachette de la Prairie", type: "discovery", tileX: 4, tileY: 21, radius: 170, zone: "wild" },
+            { id: "ancient_ruins", name: "Ruines du Gardien", type: "ruins", tileX: 34, tileY: 24, radius: 220, zone: "wild" }
+        ],
+        extraResources: [
+            { id: "herb_meadow_1", type: "herb", yields: "herb", tileX: 13, tileY: 10 },
+            { id: "herb_meadow_2", type: "herb", yields: "herb", tileX: 22, tileY: 13 },
+            { id: "herb_wild_1", type: "herb", yields: "herb", tileX: 16, tileY: 20 }
+        ],
         layoutText: [
             "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
             "TCCCT.......t...T......CCTTTT......HHH.T",
@@ -49,6 +69,14 @@ const MapsData = {
     },
     "House1": {
         tileSize: 64,
+        dangerLevel: "peaceful",
+        biome: "interior",
+        zones: [
+            { id: "house_interior", name: "Intérieur du Chalet", dangerLevel: "peaceful", minY: 0, maxY: 6 }
+        ],
+        landmarks: [
+            { id: "house_chest_room", name: "Atelier du Chalet", type: "building", tileX: 4, tileY: 3, radius: 200, zone: "peaceful" }
+        ],
         layoutText: [
             "wwwwwwwww",
             "wfffffffw",

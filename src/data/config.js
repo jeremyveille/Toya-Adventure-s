@@ -13,6 +13,17 @@ const GameConfig = {
         gold: 0,
         damage: 20
     },
+    initialEquipment: {
+        weapon: null,
+        armor: null,
+        tool: null,
+        accessory: null
+    },
+    resources: {
+        "wood": { id: "wood", name: "Bois", category: "wood", rarity: "common", biome: "meadow", iconKey: "item_wood" },
+        "stone": { id: "stone", name: "Pierre", category: "stone", rarity: "common", biome: "meadow", iconKey: "item_stone" },
+        "herb": { id: "herb", name: "Herbe Médicinale", category: "plant", rarity: "common", biome: "meadow", iconKey: "item_herb" }
+    },
     initialQuests: [
         { 
             id: "q1", 
@@ -24,8 +35,9 @@ const GameConfig = {
         }
     ],
     recipes: {
-        "bridge": { name: "Pont en Bois", cost: [{id: "wood", qty: 5}], result: {id: "bridge", name: "Pont en Bois", qty: 1} },
-        "potion": { name: "Potion de Soin", cost: [{id: "wood", qty: 2}, {id: "stone", qty: 1}], result: {id: "potion", name: "Potion de Soin", qty: 1} }
+        "bridge": { name: "Pont en Bois", cost: [{id: "wood", qty: 5}], result: {id: "bridge", name: "Pont en Bois", qty: 1, iconKey: "item_bridge"} },
+        "potion": { name: "Potion de Soin", cost: [{id: "wood", qty: 2}, {id: "stone", qty: 1}], result: {id: "potion", name: "Potion de Soin", qty: 1, iconKey: "item_potion"} },
+        "hatchet": { name: "Hachette de Récolte", cost: [{id: "wood", qty: 2}, {id: "stone", qty: 1}, {id: "herb", qty: 1}], result: {id: "hatchet", name: "Hachette de Récolte", qty: 1, iconKey: "item_hatchet", slot: "tool", harvestBonus: 1} }
     }
 };
 

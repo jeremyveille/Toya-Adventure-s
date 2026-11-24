@@ -46,6 +46,12 @@ class GameManager {
         this.inventory = [];
         /** @type {Quest[]} */
         this.quests = JSON.parse(JSON.stringify(this.config.initialQuests || []));
+        /** @type {{weapon: Object|null, armor: Object|null, tool: Object|null, accessory: Object|null}} */
+        this.equipment = JSON.parse(JSON.stringify(this.config.initialEquipment || {
+            weapon: null, armor: null, tool: null, accessory: null
+        }));
+        /** @type {Object|null} */
+        this.discoveryData = null;
     }
 
     /**
@@ -60,7 +66,9 @@ class GameManager {
         const data = {
             player: this.player,
             inventory: this.inventory,
-            quests: this.quests
+            quests: this.quests,
+            equipment: this.equipment,
+            discoveryData: this.discoveryData
         };
         try {
             if (typeof localStorage !== 'undefined') {
@@ -86,9 +94,20 @@ class GameManager {
                 // Validation très basique pour des raisons de sécurité / RGPD (minimisation des données)
                 // On s'assure que les types attendus sont présents.
                 if (data && typeof data === 'object') {
-                    if (data.player && typeof data.player.hp === 'number') this.player = data.player;
+                    if (data.player && typeof data.player.hp === 'number') {
+                        this.player = Object.assign(
+                            JSON.parse(JSON.stringify(this.config.initialPlayerState || {})),
+                            data.player
+                        );
+                    }
                     if (Array.isArray(data.inventory)) this.inventory = data.inventory;
                     if (Array.isArray(data.quests)) this.quests = data.quests;
+                    if (data.equipment && typeof data.equipment === 'object') {
+                        this.equipment = Object.assign({ weapon: null, armor: null, tool: null, accessory: null }, data.equipment);
+                    }
+                    if (data.discoveryData && typeof data.discoveryData === 'object') {
+                        this.discoveryData = data.discoveryData;
+                    }
                     console.log("Partie chargée !");
                     return true;
                 }
@@ -205,10 +224,50 @@ class GameManager {
         
         if (canCraft) {
             recipe.cost.forEach(c => this.removeItem(c.id, c.qty));
-            this.addItem({ id: recipe.result.id, name: recipe.result.name, qty: recipe.result.qty });
+            const craftedItem = {
+                id: recipe.result.id,
+                name: recipe.result.name,
+                qty: recipe.result.qty
+            };
+            if (recipe.result.iconKey) craftedItem.iconKey = recipe.result.iconKey;
+            if (recipe.result.slot) craftedItem.slot = recipe.result.slot;
+            if (recipe.result.harvestBonus) craftedItem.harvestBonus = recipe.result.harvestBonus;
+            this.addItem(craftedItem);
+            if (recipe.result.slot && this.equipment && !this.equipment[recipe.result.slot]) {
+                this.equipItem(recipe.result.id, recipe.result.slot);
+            }
             return true;
         }
         return false;
+    }
+
+    /**
+     * Equips an owned item into an equipment slot ('weapon' | 'armor' | 'tool' | 'accessory')
+     */
+    equipItem(itemId, slot = 'tool') {
+        if (!this.equipment || !Object.prototype.hasOwnProperty.call(this.equipment, slot)) return false;
+        const owned = this.inventory.find(i => i.id === itemId);
+        if (!owned) return false;
+        this.equipment[slot] = {
+            id: owned.id,
+            name: owned.name,
+            iconKey: owned.iconKey || null,
+            harvestBonus: owned.harvestBonus || (owned.id === 'hatchet' ? 1 : 0)
+        };
+        this.save();
+        return true;
+    }
+
+    /**
+     * Returns harvest yield quantity for a given resource id, applying equipped tool bonus.
+     */
+    getHarvestYield(resourceId) {
+        let base = 1;
+        const tool = this.equipment && this.equipment.tool;
+        if (tool && tool.id === 'hatchet' && (resourceId === 'wood' || resourceId === 'herb')) {
+            base += (tool.harvestBonus || 1);
+        }
+        return base;
     }
 
     /**
