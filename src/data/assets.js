@@ -13,11 +13,19 @@ const ASSET_KEYS = {
     ITEM_COINS: 'item_coins',
     ITEM_SWORD_UPGRADE: 'item_sword_upgrade',
     ITEM_TROPHY: 'item_trophy',
+    ITEM_HERB: 'item_herb',
+    ITEM_HATCHET: 'item_hatchet',
+
+    // Terrain Tilesets (64x64 top-down + Dual-Grid 15-piece compatible SpriteCook MCP)
+    TILESET_MEADOW_DIRT: 'tileset_meadow_dirt',
+    TILESET_GRASS_DIRT_DUALGRID: 'tileset_grass_dirt_dualgrid',
+    TILESET_WATER_BANK_DUALGRID: 'tileset_water_bank_dualgrid',
 
     // Environmental Props & Interactables
     PROP_TREE_LARGE: 'prop_tree_large',
     PROP_TREE_SMALL: 'prop_tree_small',
     PROP_BUSH: 'prop_bush',
+    PROP_HERB_PATCH: 'prop_herb_patch',
     PROP_ROCK: 'prop_rock',
     PROP_ROCK_LARGE: 'prop_rock_large',
     PROP_ROCK_SMALL: 'prop_rock_small',
@@ -140,6 +148,71 @@ const ASSET_MANIFEST = {
         name: 'Trophée Ancien',
         desc: 'Relique glorieuse obtenue en terrassant le Gardien des Ruines.'
     },
+    [ASSET_KEYS.ITEM_HERB]: {
+        key: ASSET_KEYS.ITEM_HERB,
+        path: 'assets/items/herb.png',
+        category: 'item',
+        type: 'image',
+        width: 32,
+        height: 32,
+        anchor: { x: 0.5, y: 0.5 },
+        scale: 1.0,
+        name: 'Herbe Médicinale',
+        desc: 'Plante aromatique des prairies utilisée pour l\'artisanat et les remèdes.'
+    },
+    [ASSET_KEYS.ITEM_HATCHET]: {
+        key: ASSET_KEYS.ITEM_HATCHET,
+        path: 'assets/items/hatchet.png',
+        category: 'item',
+        type: 'image',
+        width: 32,
+        height: 32,
+        anchor: { x: 0.5, y: 0.5 },
+        scale: 1.0,
+        name: 'Hachette de Récolte',
+        desc: 'Outil léger qui double la récolte de bois et d\'herbes.'
+    },
+
+    // ==========================================
+    // 1B. TERRAIN TILESETS (assets/tilesets/)
+    // ==========================================
+    [ASSET_KEYS.TILESET_MEADOW_DIRT]: {
+        key: ASSET_KEYS.TILESET_MEADOW_DIRT,
+        path: 'assets/tilesets/meadow_dirt_64.png',
+        category: 'terrain',
+        type: 'spritesheet',
+        frameWidth: 64,
+        frameHeight: 64,
+        anchor: { x: 0.5, y: 0.5 },
+        scale: 1.0,
+        name: 'Tileset Prairie, Terre & Pont 64px'
+    },
+    [ASSET_KEYS.TILESET_GRASS_DIRT_DUALGRID]: {
+        key: ASSET_KEYS.TILESET_GRASS_DIRT_DUALGRID,
+        path: 'assets/tilesets/grass_dirt_dualgrid_64.png',
+        category: 'terrain',
+        type: 'spritesheet',
+        frameWidth: 64,
+        frameHeight: 64,
+        dualGrid: true,
+        pieces: 15,
+        anchor: { x: 0.5, y: 0.5 },
+        scale: 1.0,
+        name: 'Tileset Dual-Grid 15-piece Herbe/Terre 64px'
+    },
+    [ASSET_KEYS.TILESET_WATER_BANK_DUALGRID]: {
+        key: ASSET_KEYS.TILESET_WATER_BANK_DUALGRID,
+        path: 'assets/tilesets/water_bank_dualgrid_64.png',
+        category: 'terrain',
+        type: 'spritesheet',
+        frameWidth: 64,
+        frameHeight: 64,
+        dualGrid: true,
+        pieces: 15,
+        anchor: { x: 0.5, y: 0.5 },
+        scale: 1.0,
+        name: 'Tileset Dual-Grid 15-piece Eau/Rive 64px'
+    },
 
     // ==========================================
     // 2. ENVIRONMENT PROPS (assets/props/)
@@ -188,6 +261,19 @@ const ASSET_MANIFEST = {
         footprint: { width: 28, height: 20, offsetY: 0 },
         harvestable: true,
         yields: 'wood'
+    },
+    [ASSET_KEYS.PROP_HERB_PATCH]: {
+        key: ASSET_KEYS.PROP_HERB_PATCH,
+        path: 'assets/props/herb_patch.png',
+        category: 'prop',
+        type: 'image',
+        width: 64,
+        height: 64,
+        anchor: { x: 0.5, y: 0.85 },
+        scale: 1.0,
+        footprint: { width: 24, height: 16, offsetY: 0 },
+        harvestable: true,
+        yields: 'herb'
     },
     [ASSET_KEYS.PROP_ROCK]: {
         key: ASSET_KEYS.PROP_ROCK,
@@ -508,12 +594,15 @@ const LEGACY_ALIASES = {
     'sword_upgrade': ASSET_KEYS.ITEM_SWORD_UPGRADE,
     'trophy': ASSET_KEYS.ITEM_TROPHY,
     'boss_trophy': ASSET_KEYS.ITEM_TROPHY,
+    'herb': ASSET_KEYS.ITEM_HERB,
+    'hatchet': ASSET_KEYS.ITEM_HATCHET,
 
     // Scene aliases
     'tiles': ASSET_KEYS.BATTLE_BG, // Heals BattleScene.js line 8 missing texture
     'tex_tree': ASSET_KEYS.PROP_TREE_LARGE,
     'tex_tree_small': ASSET_KEYS.PROP_TREE_SMALL,
     'tex_bush': ASSET_KEYS.PROP_BUSH,
+    'tex_herb': ASSET_KEYS.PROP_HERB_PATCH,
     'tex_cliff': ASSET_KEYS.PROP_CLIFF,
     'tex_house': ASSET_KEYS.PROP_HOUSE,
     'tex_ruin': ASSET_KEYS.PROP_RUIN,
