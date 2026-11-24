@@ -30,6 +30,10 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.hp = (type === 'minor' || type === 'slime_charger') ? 30 : 100;
         this.isFlashing = false;
         this.isDead = false;
+        this.isTelegraphing = false;
+        this.isLunging = false;
+        this.telegraphMarker = null;
+        this.contactDamage = 10;
 
         // Mouvement aléatoire / IA charger
         if(this.enemyType === 'minor' || this.enemyType === 'shooter' || this.enemyType === 'slime_charger' || this.enemyType === 'goblin_shooter') {
@@ -54,9 +58,9 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
     }
 
     randomWander() {
-        if(this.isFlashing || this.isDead) return; // Ne bouge pas quand on prend un coup ou mort
+        if(this.isFlashing || this.isDead || this.isTelegraphing) return; // Ne bouge pas quand on prend un coup, télégraphie ou mort
 
-        // IA Charger : fonce vers le joueur s'il est proche (< 180px)
+        // IA Charger avec attaque télégraphiée lisible : s'arrête, prévient, puis bondit
         const player = this.scene && this.scene.player;
         const isPlayerAlive = player && (player.active !== false) &&
             (!window.gameState || !window.gameState.player || window.gameState.player.hp > 0) &&
@@ -67,8 +71,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
             const dy = player.y - this.y;
             const distSq = dx * dx + dy * dy;
             if (distSq < 180 * 180 && distSq > 0.001) {
-                let vec = new Phaser.Math.Vector2(dx, dy).normalize().scale(110);
-                this.setVelocity(vec.x, vec.y);
+                this.startTelegraphedCharge(player.x, player.y);
                 return;
             }
         }
@@ -78,10 +81,81 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.setVelocity(dir[0] * 50, dir[1] * 50);
     }
 
+    /**
+     * Phase d'anticipation lisible (télégraphe) avant l'attaque chargée de l'ennemi.
+     */
+    startTelegraphedCharge(targetX, targetY) {
+        if (this.isDead || this.isTelegraphing) return;
+        this.isTelegraphing = true;
+        this.isLunging = false;
+        this.setVelocity(0, 0);
+        this.setTint(0xffb74d); // Lueur ambre d'anticipation
+
+        // Marqueur visuel "!" au-dessus de l'ennemi
+        if (this.scene && this.scene.add && typeof this.scene.add.text === 'function') {
+            this.telegraphMarker = this.scene.add.text(this.x, this.y - 54, "!", {
+                fontSize: '16px',
+                fontFamily: '"Press Start 2P", monospace',
+                color: '#ffeb3b',
+                stroke: '#b71c1c',
+                strokeThickness: 4
+            });
+            if (this.telegraphMarker && typeof this.telegraphMarker.setOrigin === 'function') {
+                this.telegraphMarker.setOrigin(0.5);
+            }
+            if (this.telegraphMarker && typeof this.telegraphMarker.setDepth === 'function') {
+                this.telegraphMarker.setDepth(Math.floor(this.y) + 20);
+            }
+        }
+
+        const executeLunge = () => {
+            this.clearTelegraphMarker();
+            this.isTelegraphing = false;
+            if (this.isDead || !this.active) return;
+            if (!this.isFlashing) this.clearTint();
+
+            const dx = targetX - this.x;
+            const dy = targetY - this.y;
+            if (dx * dx + dy * dy > 0.001) {
+                const vec = new Phaser.Math.Vector2(dx, dy).normalize().scale(165);
+                this.setVelocity(vec.x, vec.y);
+                this.isLunging = true;
+                if (this.scene && this.scene.time && typeof this.scene.time.delayedCall === 'function') {
+                    this.scene.time.delayedCall(450, () => {
+                        this.isLunging = false;
+                        if (this.active && !this.isDead && !this.isFlashing) {
+                            this.setVelocity(0, 0);
+                        }
+                    });
+                }
+            }
+        };
+
+        if (this.scene && this.scene.time && typeof this.scene.time.delayedCall === 'function') {
+            this.scene.time.delayedCall(420, executeLunge);
+        } else {
+            executeLunge();
+        }
+    }
+
+    clearTelegraphMarker() {
+        if (this.telegraphMarker && typeof this.telegraphMarker.destroy === 'function') {
+            this.telegraphMarker.destroy();
+        }
+        this.telegraphMarker = null;
+    }
+
     preUpdate(time, delta) {
         super.preUpdate(time, delta);
         // Depth sorting unifié 2.5D aux pieds
         this.setDepth(Math.floor(this.y));
+        if (this.telegraphMarker && this.telegraphMarker.active) {
+            this.telegraphMarker.x = this.x;
+            this.telegraphMarker.y = this.y - 54;
+            if (typeof this.telegraphMarker.setDepth === 'function') {
+                this.telegraphMarker.setDepth(Math.floor(this.y) + 20);
+            }
+        }
     }
 
     shootAtPlayer() {
@@ -147,12 +221,18 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
     die() {
         if (this.isDead) return;
         this.isDead = true;
+        this.isTelegraphing = false;
+        this.isLunging = false;
+        this.clearTelegraphMarker();
 
         if(this.moveEvent) this.moveEvent.remove();
         if(this.shootEvent) this.shootEvent.remove();
         if(this.shadow) {
             this.shadow.destroy();
             this.shadow = null;
+        }
+        if (this.scene && this.scene.events && typeof this.scene.events.emit === 'function') {
+            this.scene.events.emit('EnemyDefeated', this);
         }
         
         // Gain XP et Gold
