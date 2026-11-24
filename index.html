@@ -64,28 +64,6 @@
             position: relative;
         }
 
-        /* Scanlines effet CRT */
-        #game-container::after {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
-            background: linear-gradient(
-                to bottom,
-                rgba(255, 255, 255, 0),
-                rgba(255, 255, 255, 0) 50%,
-                rgba(0, 0, 0, 0.15) 50%,
-                rgba(0, 0, 0, 0.15)
-            );
-            background-size: 100% 4px;
-            z-index: 10;
-            pointer-events: none;
-            border-radius: 8px;
-        }
-
         .controls-panel {
             margin-top: 25px;
             padding: 15px 25px;
@@ -268,19 +246,20 @@
         </div>
         
         <section class="controls-panel" aria-labelledby="controls-title">
-            <h2 id="controls-title" class="sr-only">Commandes du jeu : Déplacement ZQSD ou Flèches, Attaque Espace, Interagir E, Inventaire I, Quêtes J, Artisanat K, Personnage C, Fermer Échap</h2>
+            <h2 id="controls-title" class="sr-only">Commandes du jeu : Déplacement ZQSD, WASD, Flèches ou Manette, Attaque Clic gauche ou Espace, Interagir E ou A, Inventaire I, Quêtes J, Artisanat K, Personnage C, Carte M, Fermer Échap</h2>
             <div class="controls" aria-hidden="true">
                 <div>
-                    <span>Déplacement :</span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>Flèches</kbd>
-                    <span style="margin-left: 15px;">Attaque :</span><kbd>Espace</kbd>
-                    <span style="margin-left: 15px;">Interagir :</span><kbd>E</kbd>
+                    <span>Déplacement :</span><kbd>ZQSD</kbd>/<kbd>Flèches</kbd>/<kbd>Stick</kbd>
+                    <span style="margin-left: 15px;">Attaque :</span><kbd>Clic</kbd>/<kbd>Espace</kbd>
+                    <span style="margin-left: 15px;">Interagir :</span><kbd>E</kbd>/<kbd>A</kbd>
                 </div>
                 <div style="margin-top: 10px;">
                     <span>Inventaire :</span><kbd>I</kbd>
-                    <span style="margin-left: 15px;">Quêtes :</span><kbd>J</kbd>
-                    <span style="margin-left: 15px;">Artisanat :</span><kbd>K</kbd>
-                    <span style="margin-left: 15px;">Personnage :</span><kbd>C</kbd>
-                    <span style="margin-left: 15px;">Fermer :</span><kbd>Échap</kbd>
+                    <span style="margin-left: 12px;">Quêtes :</span><kbd>J</kbd>
+                    <span style="margin-left: 12px;">Artisanat :</span><kbd>K</kbd>
+                    <span style="margin-left: 12px;">Perso :</span><kbd>C</kbd>
+                    <span style="margin-left: 12px;">Carte :</span><kbd>M</kbd>
+                    <span style="margin-left: 12px;">Fermer :</span><kbd>Échap</kbd>
                 </div>
             </div>
             
@@ -296,6 +275,9 @@
     <script src="src/data/assets.js"></script>
     <script src="src/managers/AudioManager.js"></script>
     <script src="src/managers/GameManager.js"></script>
+    <script src="src/managers/InputManager.js"></script>
+    <script src="src/systems/MapDiscoverySystem.js"></script>
+    <script src="src/systems/TerrainRenderer.js"></script>
     <script src="src/classes/Player.js"></script>
     <script src="src/classes/Enemy.js"></script>
     <script src="src/maps/maps.js"></script>

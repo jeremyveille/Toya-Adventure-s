@@ -12,6 +12,9 @@ const config = {
     },
     // Le jeu démarre avec WorldScene
     scene: [ WorldScene, BattleScene, UIScene, HUDScene ],
+    input: {
+        gamepad: true
+    },
     pixelArt: true, // Très important pour garder le style 16-bit net
     scale: {
         zoom: 1 // On peut ajuster le zoom global ici si nécessaire
