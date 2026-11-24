@@ -12,8 +12,8 @@ class BattleScene extends Phaser.Scene {
     }
 
     create() {
-        // Fond de combat, style Toriyama (désert/forêt simplifiée)
-        this.bgImage = this.add.image(0, 0, 'battle_bg').setOrigin(0,0).setScale(1.5).setTint(0x777777); // Assombrit
+        // Fond de combat pixel-art fantasy (800x600 plein écran, net nearest-neighbor)
+        this.bgImage = this.add.image(0, 0, 'battle_bg').setOrigin(0, 0);
         this.cameras.main.fadeIn(500, 255, 255, 255); // Le flash de transition
 
         // Joueur : on utilise la frame où il regarde à droite (Frame 7 ou 8)
