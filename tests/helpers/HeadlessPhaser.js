@@ -1250,8 +1250,16 @@ class PhaserScene {
             add(key, width, height) { this._textures.set(key, { key, width, height }); }
         };
         this.physics = new ArcadePhysics(this);
+        const inputEmitter = new EventEmitter();
+        const gamepadEmitter = new EventEmitter();
+        gamepadEmitter.pad1 = null;
         this.input = {
-            keyboard: new KeyboardPlugin()
+            keyboard: new KeyboardPlugin(),
+            gamepad: gamepadEmitter,
+            mouse: { disableContextMenu() {} },
+            on: (evt, fn, ctx) => inputEmitter.on(evt, fn, ctx),
+            off: (evt, fn, ctx) => inputEmitter.off(evt, fn, ctx),
+            emit: (evt, ...args) => inputEmitter.emit(evt, ...args)
         };
         this.tweens = new TweenManager(this);
         this.time = new TimeManager(this);
@@ -1355,8 +1363,18 @@ function setupHeadlessEnvironment(rootDir = path.resolve(__dirname, '../..')) {
     // 2. Load Core Modules
     const GameConfig = require(path.join(rootDir, 'src/data/config.js'));
     const GameManager = require(path.join(rootDir, 'src/managers/GameManager.js'));
+    const { InputManager, InputActions, GAMEPAD_BUTTONS } = require(path.join(rootDir, 'src/managers/InputManager.js'));
+    const { MapDiscoverySystem, DANGER_LEVELS } = require(path.join(rootDir, 'src/systems/MapDiscoverySystem.js'));
+    const { TerrainRenderer } = require(path.join(rootDir, 'src/systems/TerrainRenderer.js'));
     global.GameConfig = GameConfig;
     global.GameManager = GameManager;
+    global.InputManager = InputManager;
+    global.InputActions = InputActions;
+    global.GAMEPAD_BUTTONS = GAMEPAD_BUTTONS;
+    global.MapDiscoverySystem = MapDiscoverySystem;
+    global.DANGER_LEVELS = DANGER_LEVELS;
+    global.TerrainRenderer = TerrainRenderer;
+    global.inputManager = new InputManager();
 
     const mapsSource = fs.readFileSync(path.join(rootDir, 'src/maps/maps.js'), 'utf8');
     const MapsData = new Function(mapsSource + '; return MapsData;')();
@@ -1431,6 +1449,12 @@ function setupHeadlessEnvironment(rootDir = path.resolve(__dirname, '../..')) {
         Phaser,
         GameConfig,
         GameManager,
+        InputManager,
+        InputActions,
+        GAMEPAD_BUTTONS,
+        MapDiscoverySystem,
+        DANGER_LEVELS,
+        TerrainRenderer,
         MapsData,
         Player,
         Enemy,

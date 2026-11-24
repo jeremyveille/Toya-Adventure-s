@@ -123,7 +123,13 @@ function runTests() {
     const resE2e = child_process.spawnSync(process.execPath, [suiteE2ePath], { stdio: 'inherit' });
     const suiteE2ePassed = resE2e.status === 0;
 
-    // --- 4. AGGREGATED REPORT ---
+    // --- 4. ITERATION 1 & MULTI-INPUT SUITE (15 TESTS) ---
+    console.log("\n--- 4. ITERATION 1 & MULTI-INPUT SUITE (15 TESTS) ---");
+    const suiteIter1Path = path.join(__dirname, 'test_iteration1_suite.js');
+    const resIter1 = child_process.spawnSync(process.execPath, [suiteIter1Path], { stdio: 'inherit' });
+    const suiteIter1Passed = resIter1.status === 0;
+
+    // --- 5. AGGREGATED REPORT ---
     const totalLegacy = legacyPassed + legacyFailed;
     const total25d = 52;
     const passed25d = suite25dPassed ? 52 : 0;
@@ -133,9 +139,13 @@ function runTests() {
     const passedE2e = suiteE2ePassed ? 93 : 0;
     const failedE2e = suiteE2ePassed ? 0 : 93;
 
-    const grandTotal = totalLegacy + total25d + totalE2e;
-    const grandPassed = legacyPassed + passed25d + passedE2e;
-    const grandFailed = legacyFailed + failed25d + failedE2e;
+    const totalIter1 = 15;
+    const passedIter1 = suiteIter1Passed ? 15 : 0;
+    const failedIter1 = suiteIter1Passed ? 0 : 15;
+
+    const grandTotal = totalLegacy + total25d + totalE2e + totalIter1;
+    const grandPassed = legacyPassed + passed25d + passedE2e + passedIter1;
+    const grandFailed = legacyFailed + failed25d + failedE2e + failedIter1;
 
     console.log("\n================================================================================");
     console.log("                  GRAND TOTAL TEST EXECUTION SUMMARY");
@@ -143,17 +153,18 @@ function runTests() {
     console.log(`  1. Legacy GameManager Unit Tests  : ${legacyPassed} / ${totalLegacy} PASS`);
     console.log(`  2. 2.5D RPG Regression Suite       : ${passed25d} / ${total25d} PASS`);
     console.log(`  3. E2E Requirement-Driven Suite   : ${passedE2e} / ${totalE2e} PASS`);
+    console.log(`  4. Iteration 1 & Multi-Input Suite: ${passedIter1} / ${totalIter1} PASS`);
     console.log("--------------------------------------------------------------------------------");
     console.log(`  TOTAL TESTS AGGREGATED            : ${grandTotal}`);
     console.log(`  TOTAL PASSED                      : ${grandPassed}`);
     console.log(`  TOTAL FAILED                      : ${grandFailed}`);
     console.log("================================================================================");
 
-    if (grandFailed > 0 || !suite25dPassed || !suiteE2ePassed) {
+    if (grandFailed > 0 || !suite25dPassed || !suiteE2ePassed || !suiteIter1Passed) {
         console.error("\n>>> EXECUTION COMPLETED WITH FAILURES <<<\n");
         process.exit(1);
     } else {
-        console.log("\n>>> ALL 150 TESTS PASSED SUCCESSFULLY! <<<\n");
+        console.log(`\n>>> ALL ${grandTotal} TESTS PASSED SUCCESSFULLY! <<<\n`);
         process.exit(0);
     }
 }
